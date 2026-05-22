@@ -115,29 +115,114 @@ def safe_click(driver: webdriver.Chrome, element) -> None:
         driver.execute_script("arguments[0].click();", element)
 
 
-def preencher_input(driver, wait, index: int, texto: str) -> None:
-    """
-    Localiza o input pelo índice e preenche via JavaScript.
-    Evita o mecanismo de send_keys (instável em containers headless).
-    """
-    inputs = wait.until(EC.presence_of_all_elements_located(
-        (By.XPATH, "//input[@type='text' or @type='number']")
-    ))
-    campo = inputs[index]
-    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", campo)
+def xpath_literal(texto: str) -> str:
+    if "'" not in texto:
+        return f"'{texto}'"
+    if '"' not in texto:
+        return f'"{texto}"'
+    partes = texto.split("'")
+    return "concat(" + ", \"'\", ".join(f"'{parte}'" for parte in partes) + ")"
+
+
+def _elementos_editaveis_visiveis(root) -> List:
+    elementos = root.find_elements(
+        By.XPATH,
+        ".//textarea | .//input[(@type='text' or @type='number') and not(@type='hidden')]",
+    )
+    return [el for el in elementos if el.is_displayed()]
+
+
+def _preencher_elemento(driver, elemento, texto: str) -> None:
+    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", elemento)
     time.sleep(0.2)
-    # Foca o elemento
-    driver.execute_script("arguments[0].focus();", campo)
-    # Limpa e define valor via JS
-    driver.execute_script("arguments[0].value = '';", campo)
-    driver.execute_script("arguments[0].value = arguments[1];", campo, texto)
-    # Dispara eventos para o Google Forms reconhecer a mudança
+
+    tag = (elemento.tag_name or "").lower()
+    if tag == "textarea":
+        try:
+            elemento.clear()
+        except Exception:
+            pass
+        driver.execute_script("arguments[0].value = arguments[1];", elemento, texto)
+    else:
+        driver.execute_script("arguments[0].focus();", elemento)
+        driver.execute_script("arguments[0].value = '';", elemento)
+        driver.execute_script("arguments[0].value = arguments[1];", elemento, texto)
+
     driver.execute_script("""
         var el = arguments[0];
         ['input', 'change', 'blur'].forEach(function(evtName) {
             el.dispatchEvent(new Event(evtName, { bubbles: true }));
         });
-    """, campo)
+    """, elemento)
+
+
+def preencher_input_por_html(driver, wait, indice: int, texto: str) -> None:
+    """Fallback baseado na estrutura visível do HTML da página."""
+    wait.until(lambda d: len(_elementos_editaveis_visiveis(d)) > indice)
+    elementos = _elementos_editaveis_visiveis(driver)
+
+    if len(elementos) <= indice:
+        raise IndexError(
+            f"Não foi possível localizar o campo HTML de índice {indice}. "
+            f"Encontrados {len(elementos)} elementos editáveis visíveis."
+        )
+
+    _preencher_elemento(driver, elementos[indice], texto)
+
+
+def preencher_input_por_pergunta(driver, wait, pergunta: str, texto: str) -> None:
+    """Localiza o input associado ao texto da pergunta e preenche o campo."""
+    bloco_xpath = (
+        f"//div[@jsmodel='CP1oW'][.//*[self::span or self::div or self::label]"
+        f"[contains(normalize-space(.), {xpath_literal(pergunta)})]]"
+    )
+
+    try:
+        container = wait.until(EC.presence_of_element_located((By.XPATH, bloco_xpath)))
+    except Exception:
+        container = None
+
+    if container is None:
+        pergunta_xpath = (
+            f"//*[self::span or self::div or self::label][contains(normalize-space(.), {xpath_literal(pergunta)})]"
+        )
+        pergunta_element = wait.until(EC.presence_of_element_located((By.XPATH, pergunta_xpath)))
+
+        try:
+            container = pergunta_element.find_element(
+                By.XPATH,
+                "./ancestor::div[@jsmodel='CP1oW'][1]",
+            )
+        except Exception:
+            container = pergunta_element
+
+    inputs = _elementos_editaveis_visiveis(container)
+
+    if not inputs:
+        inputs = _elementos_editaveis_visiveis(driver)
+
+    if not inputs:
+        raise IndexError(f"Não foi possível localizar o campo da pergunta: {pergunta}")
+
+    _preencher_elemento(driver, inputs[0], texto)
+
+
+def preencher_input(driver, wait, index: int, texto: str) -> None:
+    """Fallback antigo mantido para páginas que ainda usem ordem simples dos inputs."""
+    xpath_inputs = "//textarea | //input[(@type='text' or @type='number') and not(@type='hidden')]"
+
+    wait.until(
+        lambda d: len([el for el in d.find_elements(By.XPATH, xpath_inputs) if el.is_displayed()]) > index
+    )
+    inputs = [el for el in driver.find_elements(By.XPATH, xpath_inputs) if el.is_displayed()]
+
+    if len(inputs) <= index:
+        raise IndexError(
+            f"Não foi possível localizar o input de índice {index}. "
+            f"Encontrados {len(inputs)} inputs visíveis."
+        )
+
+    _preencher_elemento(driver, inputs[index], texto)
 
 
 def ordenar_rotas_por_preferencia(rotas: List[str], bairros_preferidos: List[str]) -> List[str]:
@@ -260,14 +345,14 @@ def obter_rotas_disponiveis(
         log("Aguardando inputs de identificação...", "MAP")
         
         try:
-            preencher_input(driver, wait, 0, nome)
+            preencher_input_por_pergunta(driver, wait, "Qual seu nome?", nome)
             log(f"✅ Nome preenchido: {nome}", "MAP")
         except Exception as e:
             log(f"⚠️ Erro ao preencher nome: {str(e)[:80]}", "AVISO")
             raise
         
         try:
-            preencher_input(driver, wait, 1, id_func)
+            preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func)
             log(f"✅ ID preenchido: {id_func}", "MAP")
         except Exception as e:
             log(f"⚠️ Erro ao preencher ID: {str(e)[:80]}", "AVISO")
@@ -393,10 +478,10 @@ def enviar_formulario(
 
         # Página 1: Identificação
         log("  Preenchendo página 1 (identificação)...", "DEBUG")
-        preencher_input(driver, wait, 0, nome)
+        preencher_input_por_pergunta(driver, wait, "Qual seu nome?", nome)
         log(f"    ✅ Nome: {nome}", "DEBUG")
         
-        preencher_input(driver, wait, 1, id_func)
+        preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func)
         log(f"    ✅ ID: {id_func}", "DEBUG")
         
         log("  Clicando botão Avançar (página 1)...", "DEBUG")

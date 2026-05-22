@@ -185,7 +185,19 @@ def preencher_input(driver: webdriver.Chrome, wait: WebDriverWait, index: int, t
         index: Índice do input
         texto: Texto a inserir
     """
-    inputs = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//input[@type='text' or @type='number']")))
+    xpath_inputs = "//input[@type='text' or @type='number']"
+
+    wait.until(
+        lambda d: len([el for el in d.find_elements(By.XPATH, xpath_inputs) if el.is_displayed()]) > index
+    )
+    inputs = [el for el in driver.find_elements(By.XPATH, xpath_inputs) if el.is_displayed()]
+
+    if len(inputs) <= index:
+        raise IndexError(
+            f"Não foi possível localizar o input de índice {index}. "
+            f"Encontrados {len(inputs)} inputs visíveis."
+        )
+
     campo = inputs[index]
     safe_click(driver, campo)
     campo.clear()
