@@ -48,7 +48,7 @@ BAIRROS_DEFAULT = [
     "Dias Macedo", "Damas", "Montese", "Jardim América", "Parreão",
     "Fátima", "Serrinha", "Cidade dos Funcionários", "Parque Iracema",
     "Parque Manibura", "Parquelandia", "Amadeu Furtado", "Rodolfo Teofilo",
-    "São Gerardo", "Bom Futuro", "Vila União"
+    "São Gerardo", "Bom Futuro", "Vila União", "Aeroporto"
 ]
 
 BAIRROS_PREFERIDOS_DEFAULT = [
