@@ -1,5 +1,6 @@
 import logging
 import os
+import datetime
 import time
 import unicodedata
 from typing import List
@@ -19,6 +20,17 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ==================== VERIFICAÇÃO DE LICENÇA ====================
+# Configure aqui a data de vencimento (ANO, MÊS, DIA)
+# Exemplo atual: 5 de Julho de 2026 (30 dias)
+DATA_EXPIRACAO = datetime.date(2026, 6, 15)
+DATA_ATUAL = datetime.date.today()
+
+if DATA_ATUAL > DATA_EXPIRACAO:
+    st.error("🔒 **Acesso Expirado!**")
+    st.warning(f"Sua licença venceu no dia {DATA_EXPIRACAO.strftime('%d/%m/%Y')}. Por favor, entre em contato para renovar o acesso mensal.")
+    st.stop()  # Isso impede que o restante do site carregue
 
 # ==================== CSS CUSTOMIZADO ====================
 st.markdown("""
@@ -43,12 +55,28 @@ MAX_TENTATIVAS = 2
 INTERVALO_RETRY = 2
 
 BAIRROS_DEFAULT = [
-    "Cambeba", "Guararapes", "Benfica", "Itaperi", "Rodolfo Teófilo", "Cajazeiras",
-    "Aerolândia", "Alto da Balança", "Boa Vista", "Luciano Cavalcante",
-    "Dias Macedo", "Damas", "Montese", "Jardim América", "Parreão",
-    "Fátima", "Serrinha", "Cidade dos Funcionários", "Parque Iracema",
-    "Parque Manibura", "Parquelandia", "Amadeu Furtado", "Rodolfo Teofilo",
-    "São Gerardo", "Bom Futuro", "Vila União", "Aeroporto", "Monte Castelo", "Parque Araxá"
+    "Aerolândia", "Aeroporto", "Aldeota", "Alto da Balança", "Amadeu Furtado", 
+    "Ancuri", "Antônio Bezerra", "Autran Nunes", "Barra do Ceará", "Barroso", 
+    "Bela Vista", "Benfica", "Bom Futuro", "Bom Jardim", "Bonsucesso", 
+    "Cais do Porto", "Cambeba", "Canindezinho", "Carlito Pamplona", "Castelão", 
+    "Centro", "Cidade dos Funcionários", "Cidade Nova", "Coaçu", "Cocó", 
+    "Conjunto Ceará I", "Conjunto Ceará II", "Conjunto Esperança", "Couto Fernandes", "Curió", 
+    "Damas", "De Lourdes", "Dias Macedo", "Dom Lustosa", "Edson Queiroz", 
+    "Engenheiro Luciano Cavalcante", "Farias Brito", "Fátima", "Floresta", "Genibaú", 
+    "Granja Lisboa", "Granja Portugal", "Guajeru", "Guararapes", "Henrique Jorge", 
+    "Itaoca", "Itaperi", "Jacarecanga", "Jangurussu", "Jardim América", 
+    "Jardim Cearense", "Jardim das Oliveiras", "Jardim Iracema", "José Bonifácio", "José de Alencar", 
+    "Manuel Sátiro", "Maraponga", "Meireles", "Messejana", "Mondubim", 
+    "Monte Castelo", "Montese", "Moura Brasil", "Mucuripe", "Novo Mondubim", 
+    "Olavo Bilac", "Panamericano", "Papicu", "Parangaba", "Parque Araxá", 
+    "Parque Dois Irmãos", "Parque Iracema", "Parque Manibura", "Parque Presidente Vargas", "Parque Santa Maria", 
+    "Parque Santa Rosa", "Parquelândia", "Parreão", "Passaré", "Paupina", 
+    "Pedras", "Pici", "Pirambu", "Planalto Ayrton Senna", "Praia de Iracema", 
+    "Praia do Futuro", "Prefeito José Walter", "Quintino Cunha", "Rodolfo Teófilo", "Sabiaguaba", 
+    "Salinas", "Santa Maria", "Santa Rosa", "São Bento", "São Gerardo", 
+    "São João do Tauape", "Sapiranga/Coité", "Serrinha", "Siqueira", "Varjota", 
+    "Vicente Pinzón", "Vila Ellery", "Vila Manoel Sátiro", "Vila Peri", "Vila União", 
+    "Vila Velha"
 ]
 
 BAIRROS_PREFERIDOS_DEFAULT = [
@@ -566,13 +594,20 @@ def enviar_formulario(
 # ── Sidebar: Credenciais ──────────────────────────────────────
 with st.sidebar:
     st.title("📋 Automação Forms")
+    
+    dias_restantes = (DATA_EXPIRACAO - DATA_ATUAL).days
+    if dias_restantes <= 5:
+        st.warning(f"⚠️ Licença expira em {dias_restantes} dias.")
+    else:
+        st.success(f"✅ Licença ativa: {dias_restantes} dias restantes.")
+        
     st.divider()
 
     st.subheader("👤 Dados do Funcionário")
-    nome_input    = st.text_input("Nome completo", placeholder="Ex: João Silva",
+    nome_input    = st.text_input("Nome completo", value="Thiago Bezerra", disabled=True, placeholder="Ex: João Silva",
                                    help="Preenchido no campo Nome do formulário")
-    id_input      = st.text_input("ID do Funcionário", placeholder="Ex: 12345")
-    telefone_input = st.text_input("Telefone", placeholder="Ex: 85999999999")
+    id_input      = st.text_input("ID do Funcionário", value="2359946", disabled=True, placeholder="Ex: 12345")
+    telefone_input = st.text_input("Telefone", value="85988299118", disabled=True, placeholder="Ex: 85999999999")
 
     st.divider()
     st.subheader("⚙️ Configurações Avançadas")
