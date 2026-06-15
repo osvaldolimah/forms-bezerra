@@ -24,7 +24,7 @@ st.set_page_config(
 # ==================== VERIFICAÇÃO DE LICENÇA ====================
 # Configure aqui a data de vencimento (ANO, MÊS, DIA)
 # Exemplo atual: 5 de Julho de 2026 (30 dias)
-DATA_EXPIRACAO = datetime.date(2026, 6, 15)
+DATA_EXPIRACAO = datetime.date(2026, 6, 20)
 DATA_ATUAL = datetime.date.today()
 
 if DATA_ATUAL > DATA_EXPIRACAO:
