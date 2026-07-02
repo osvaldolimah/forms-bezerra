@@ -48,12 +48,13 @@ BAIRROS_DEFAULT = [
     "Dias Macedo", "Damas", "Montese", "Jardim América", "Parreão",
     "Fátima", "Serrinha", "Cidade dos Funcionários", "Parque Iracema",
     "Parque Manibura", "Parquelandia", "Amadeu Furtado", "Rodolfo Teofilo",
-    "São Gerardo", "Bom Futuro", "Vila União", "Aeroporto", "Monte Castelo", "Parque Araxá"
+    "São Gerardo", "Bom Futuro", "Vila União", "Aeroporto", "Monte Castelo", "Parque Araxá", "Pici"
 ]
 
 BAIRROS_PREFERIDOS_DEFAULT = [
     "Parque Iracema", "Cajazeiras", "Cambeba", "Damas",
-    "Itaperi", "Guararapes", "Luciano Cavalcante"
+    "Itaperi", "Guararapes", "Luciano Cavalcante", "Bom Futuro", "Dias Macedo", "Parreão",
+    "Jardim América", "Aerolândia", "Boa Vista", "São Gerardo", "Monte Castelo"
 ]
 
 # ==================== SESSION STATE ====================
@@ -569,10 +570,13 @@ with st.sidebar:
     st.divider()
 
     st.subheader("👤 Dados do Funcionário")
-    nome_input    = st.text_input("Nome completo", placeholder="Ex: João Silva",
+    nome_input    = st.text_input("Nome completo", value="Osvaldo Holanda",
+                                   placeholder="Ex: João Silva",
                                    help="Preenchido no campo Nome do formulário")
-    id_input      = st.text_input("ID do Funcionário", placeholder="Ex: 12345")
-    telefone_input = st.text_input("Telefone", placeholder="Ex: 85999999999")
+    id_input      = st.text_input("ID do Funcionário", value="2445201",
+                                   placeholder="Ex: 12345")
+    telefone_input = st.text_input("Telefone", value="85988449973",
+                                   placeholder="Ex: 85999999999")
 
     st.divider()
     st.subheader("⚙️ Configurações Avançadas")
@@ -588,173 +592,193 @@ with st.sidebar:
 
 # ── Main ──────────────────────────────────────────────────────
 st.title("📋 Automação Google Forms")
-st.markdown("Preenche e envia formulários de escala automaticamente com base nos bairros configurados.")
 
-# ── URL ───────────────────────────────────────────────────────
-url_input = st.text_input(
-    "🔗 URL do Formulário Google",
-    placeholder="https://docs.google.com/forms/d/e/.../viewform",
-    label_visibility="visible"
-)
+tab_escala, tab_outro = st.tabs(["Formulário de Escala", "Outro Formulário"])
 
-# ── Configuração de Bairros ───────────────────────────────────
-with st.expander("🏘️ Configuração de Bairros", expanded=False):
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown("**Meus Bairros** *(um por linha)*")
-        bairros_txt = st.text_area(
-            "meus_bairros", label_visibility="hidden",
-            value="\n".join(BAIRROS_DEFAULT), height=220,
-            help="Bairros que você atende. O formulário será enviado apenas para rotas que contenham esses bairros."
-        )
-    with col_b:
-        st.markdown("**Ordem de Preferência** *(um por linha)*")
-        pref_txt = st.text_area(
-            "bairros_pref", label_visibility="hidden",
-            value="\n".join(BAIRROS_PREFERIDOS_DEFAULT), height=220,
-            help="Bairros mais prioritários ficam no topo. Os demais ficam ao final da fila."
-        )
+with tab_escala:
+    st.markdown("Preenche e envia formulários de escala automaticamente com base nos bairros configurados.")
 
-meus_bairros   = [b.strip() for b in bairros_txt.splitlines() if b.strip()]
-bairros_pref   = [b.strip() for b in pref_txt.splitlines() if b.strip()]
+    # ── URL ───────────────────────────────────────────────────────
+    url_input = st.text_input(
+        "🔗 URL do Formulário Google",
+        placeholder="https://docs.google.com/forms/d/e/.../viewform",
+        label_visibility="visible",
+        key="url_escala"
+    )
 
-st.divider()
-
-# ── Fase 1: Mapear Rotas ──────────────────────────────────────
-col1, col2, col3 = st.columns([2, 2, 4])
-
-with col1:
-    btn_mapear = st.button("🗺️ Mapear Rotas", use_container_width=True, type="secondary")
-
-with col2:
-    btn_limpar = st.button("🔄 Limpar", use_container_width=True)
-
-if btn_limpar:
-    st.session_state.rotas_disponiveis = []
-    st.session_state.rotas_selecionadas = []
-    st.session_state.resultado = {}
-    st.session_state.logs = []
-    st.session_state.fase = "idle"
-    st.rerun()
-
-# Validações antes de mapear
-if btn_mapear:
-    erros = []
-    if not nome_input.strip():    erros.append("Nome do funcionário")
-    if not id_input.strip():      erros.append("ID do funcionário")
-    if not telefone_input.strip(): erros.append("Telefone")
-    if not url_input.strip():     erros.append("URL do formulário")
-    elif not validar_url(url_input.strip()):
-        erros.append("URL inválida (deve ser docs.google.com/forms ou forms.gle)")
-
-    if erros:
-        st.error("Preencha os campos obrigatórios: " + " · ".join(erros))
-    else:
-        st.session_state.logs = []
-        st.session_state.rotas_disponiveis = []
-        st.session_state.fase = "mapeando"
-
-        log_placeholder = st.empty()
-        log = make_log_fn(log_placeholder)
-
-        with st.spinner("Mapeando rotas disponíveis no formulário..."):
-            rotas = obter_rotas_disponiveis(
-                url_input.strip(), nome_input.strip(),
-                id_input.strip(), meus_bairros, log
+    # ── Configuração de Bairros ───────────────────────────────────
+    with st.expander("🏘️ Configuração de Bairros", expanded=False):
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("**Meus Bairros** *(um por linha)*")
+            bairros_txt = st.text_area(
+                "meus_bairros", label_visibility="hidden",
+                value="\n".join(BAIRROS_DEFAULT), height=220,
+                help="Bairros que você atende. O formulário será enviado apenas para rotas que contenham esses bairros."
+            )
+        with col_b:
+            st.markdown("**Ordem de Preferência** *(um por linha)*")
+            pref_txt = st.text_area(
+                "bairros_pref", label_visibility="hidden",
+                value="\n".join(BAIRROS_PREFERIDOS_DEFAULT), height=220,
+                help="Bairros mais prioritários ficam no topo. Os demais ficam ao final da fila."
             )
 
-        if rotas:
-            rotas_ord = ordenar_rotas_por_preferencia(rotas, bairros_pref)
-            st.session_state.rotas_disponiveis = rotas_ord
-            st.session_state.rotas_selecionadas = rotas_ord.copy()
-            st.session_state.fase = "mapeado"
-            st.rerun()
-        else:
-            st.session_state.fase = "idle"
-            st.warning("Nenhuma rota compatível encontrada. Verifique a lista de bairros.")
-
-# ── Exibir rotas mapeadas + seleção ───────────────────────────
-if st.session_state.fase in ("mapeado", "concluido") and st.session_state.rotas_disponiveis:
-    st.success(f"✅ {len(st.session_state.rotas_disponiveis)} rota(s) encontrada(s)")
-
-    st.markdown("#### Selecione as rotas para envio:")
-    selecionadas = []
-    cols = st.columns(2)
-    for i, rota in enumerate(st.session_state.rotas_disponiveis):
-        status_icon = ""
-        if rota in st.session_state.resultado:
-            status_icon = " ✅" if st.session_state.resultado[rota] else " ❌"
-        checked = st.session_state.resultado.get(rota) is None  # Desmarca as que já foram processadas
-        with cols[i % 2]:
-            if st.checkbox(rota + status_icon, value=checked, key=f"rota_{i}"):
-                selecionadas.append(rota)
-
-    st.session_state.rotas_selecionadas = selecionadas
+    meus_bairros   = [b.strip() for b in bairros_txt.splitlines() if b.strip()]
+    bairros_pref   = [b.strip() for b in pref_txt.splitlines() if b.strip()]
 
     st.divider()
 
-    # ── Fase 2: Enviar Formulários ────────────────────────────
-    btn_enviar = st.button(
-        f"🚀 Enviar {len(selecionadas)} Formulário(s)",
-        type="primary", use_container_width=False,
-        disabled=len(selecionadas) == 0
-    )
+    # ── Fase 1: Mapear Rotas ──────────────────────────────────────
+    col1, col2, col3 = st.columns([2, 2, 4])
 
-    if btn_enviar:
-        if not nome_input.strip() or not id_input.strip() or not telefone_input.strip():
-            st.error("Credenciais incompletas na barra lateral.")
+    with col1:
+        btn_mapear = st.button("🗺️ Mapear Rotas", use_container_width=True, type="secondary")
+
+    with col2:
+        btn_limpar = st.button("🔄 Limpar", use_container_width=True)
+
+    if btn_limpar:
+        st.session_state.rotas_disponiveis = []
+        st.session_state.rotas_selecionadas = []
+        st.session_state.resultado = {}
+        st.session_state.logs = []
+        st.session_state.fase = "idle"
+        st.rerun()
+
+    # Validações antes de mapear
+    if btn_mapear:
+        erros = []
+        if not nome_input.strip():    erros.append("Nome do funcionário")
+        if not id_input.strip():      erros.append("ID do funcionário")
+        if not telefone_input.strip(): erros.append("Telefone")
+        if not url_input.strip():     erros.append("URL do formulário")
+        elif not validar_url(url_input.strip()):
+            erros.append("URL inválida (deve ser docs.google.com/forms ou forms.gle)")
+
+        if erros:
+            st.error("Preencha os campos obrigatórios: " + " · ".join(erros))
         else:
             st.session_state.logs = []
-            st.session_state.resultado = {}
-            st.session_state.fase = "enviando"
+            st.session_state.rotas_disponiveis = []
+            st.session_state.fase = "mapeando"
 
             log_placeholder = st.empty()
             log = make_log_fn(log_placeholder)
 
-            progresso = st.progress(0, text="Iniciando envios...")
-            total = len(selecionadas)
-            sucesso_count, falha_count = 0, 0
-
-            for idx, rota in enumerate(selecionadas, 1):
-                progresso.progress(
-                    (idx - 1) / total,
-                    text=f"[{idx}/{total}] Enviando: {rota}"
+            with st.spinner("Mapeando rotas disponíveis no formulário..."):
+                rotas = obter_rotas_disponiveis(
+                    url_input.strip(), nome_input.strip(),
+                    id_input.strip(), meus_bairros, log
                 )
-                log(f"[{idx}/{total}] Processando: {rota}", "PROC")
 
-                ok = enviar_formulario(
-                    url_input.strip(), rota,
-                    nome_input.strip(), id_input.strip(), telefone_input.strip(),
-                    log
-                )
-                st.session_state.resultado[rota] = ok
-
-                if ok:
-                    sucesso_count += 1
-                else:
-                    falha_count += 1
-
-                if idx < total:
-                    log(f"Aguardando {intervalo}s até próximo envio...", "WAIT")
-                    time.sleep(intervalo)
-
-            progresso.progress(1.0, text="Concluído!")
-            st.session_state.fase = "concluido"
-
-            # Resumo final
-            st.divider()
-            st.subheader("📊 Resumo Final")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Total Enviado", total)
-            c2.metric("✅ Sucessos", sucesso_count)
-            c3.metric("❌ Falhas", falha_count)
-
-            if falha_count == 0:
-                st.success("Todos os formulários foram enviados com sucesso! 🎉")
-            elif sucesso_count == 0:
-                st.error("Nenhum formulário foi enviado com sucesso. Verifique os logs.")
+            if rotas:
+                rotas_ord = ordenar_rotas_por_preferencia(rotas, bairros_pref)
+                st.session_state.rotas_disponiveis = rotas_ord
+                st.session_state.rotas_selecionadas = rotas_ord.copy()
+                st.session_state.fase = "mapeado"
+                st.rerun()
             else:
-                st.warning(f"{sucesso_count} enviado(s) com sucesso, {falha_count} com falha.")
+                st.session_state.fase = "idle"
+                st.warning("Nenhuma rota compatível encontrada. Verifique a lista de bairros.")
+
+    # ── Exibir rotas mapeadas + seleção ───────────────────────────
+    if st.session_state.fase in ("mapeado", "concluido") and st.session_state.rotas_disponiveis:
+        st.success(f"✅ {len(st.session_state.rotas_disponiveis)} rota(s) encontrada(s)")
+
+        st.markdown("#### Selecione as rotas para envio:")
+        selecionadas = []
+        cols = st.columns(2)
+        for i, rota in enumerate(st.session_state.rotas_disponiveis):
+            status_icon = ""
+            if rota in st.session_state.resultado:
+                status_icon = " ✅" if st.session_state.resultado[rota] else " ❌"
+            checked = st.session_state.resultado.get(rota) is None  # Desmarca as que já foram processadas
+            with cols[i % 2]:
+                if st.checkbox(rota + status_icon, value=checked, key=f"rota_{i}"):
+                    selecionadas.append(rota)
+
+        st.session_state.rotas_selecionadas = selecionadas
+
+        st.divider()
+
+        # ── Fase 2: Enviar Formulários ────────────────────────────
+        btn_enviar = st.button(
+            f"🚀 Enviar {len(selecionadas)} Formulário(s)",
+            type="primary", use_container_width=False,
+            disabled=len(selecionadas) == 0
+        )
+
+        if btn_enviar:
+            if not nome_input.strip() or not id_input.strip() or not telefone_input.strip():
+                st.error("Credenciais incompletas na barra lateral.")
+            else:
+                st.session_state.logs = []
+                st.session_state.resultado = {}
+                st.session_state.fase = "enviando"
+
+                log_placeholder = st.empty()
+                log = make_log_fn(log_placeholder)
+
+                progresso = st.progress(0, text="Iniciando envios...")
+                total = len(selecionadas)
+                sucesso_count, falha_count = 0, 0
+
+                for idx, rota in enumerate(selecionadas, 1):
+                    progresso.progress(
+                        (idx - 1) / total,
+                        text=f"[{idx}/{total}] Enviando: {rota}"
+                    )
+                    log(f"[{idx}/{total}] Processando: {rota}", "PROC")
+
+                    ok = enviar_formulario(
+                        url_input.strip(), rota,
+                        nome_input.strip(), id_input.strip(), telefone_input.strip(),
+                        log
+                    )
+                    st.session_state.resultado[rota] = ok
+
+                    if ok:
+                        sucesso_count += 1
+                    else:
+                        falha_count += 1
+
+                    if idx < total:
+                        log(f"Aguardando {intervalo}s até próximo envio...", "WAIT")
+                        time.sleep(intervalo)
+
+                progresso.progress(1.0, text="Concluído!")
+                st.session_state.fase = "concluido"
+
+                # Resumo final
+                st.divider()
+                st.subheader("📊 Resumo Final")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Total Enviado", total)
+                c2.metric("✅ Sucessos", sucesso_count)
+                c3.metric("❌ Falhas", falha_count)
+
+                if falha_count == 0:
+                    st.success("Todos os formulários foram enviados com sucesso! 🎉")
+                elif sucesso_count == 0:
+                    st.error("Nenhum formulário foi enviado com sucesso. Verifique os logs.")
+                else:
+                    st.warning(f"{sucesso_count} enviado(s) com sucesso, {falha_count} com falha.")
+
+with tab_outro:
+    st.markdown("Preenche um outro formulário diferente da escala.")
+
+    url_outro = st.text_input(
+        "🔗 URL do Outro Formulário Google",
+        placeholder="https://docs.google.com/forms/d/e/.../viewform",
+        label_visibility="visible",
+        key="url_outro"
+    )
+    
+    st.info("Aqui você pode criar os inputs específicos para esse novo formulário e invocar uma função de preenchimento.")
+    
+    if st.button("🚀 Enviar Outro Formulário", type="primary"):
+        st.success("A lógica de preenchimento para este formulário será construída aqui.")
 
 # ── Log persistente (após execução) ──────────────────────────
 if st.session_state.logs and st.session_state.fase not in ("enviando",):

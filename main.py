@@ -8,7 +8,7 @@ import time
 import unicodedata
 
 # --- DADOS ---
-NOME = "Francisco Osvaldo Lima Holanda"
+NOME = "Osvaldo Holanda"
 ID_FUNC = "2445201"
 TELEFONE = "85988449973"
 
