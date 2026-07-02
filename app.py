@@ -53,7 +53,8 @@ BAIRROS_DEFAULT = [
 
 BAIRROS_PREFERIDOS_DEFAULT = [
     "Parque Iracema", "Cajazeiras", "Cambeba", "Damas",
-    "Itaperi", "Guararapes", "Luciano Cavalcante"
+    "Itaperi", "Guararapes", "Luciano Cavalcante", "Bom Futuro", "Dias Macedo", "Parreão",
+    "Jardim América", "Aerolândia", "Boa Vista", "São Gerardo", "Monte Castelo"
 ]
 
 # ==================== SESSION STATE ====================
@@ -569,10 +570,13 @@ with st.sidebar:
     st.divider()
 
     st.subheader("👤 Dados do Funcionário")
-    nome_input    = st.text_input("Nome completo", placeholder="Ex: João Silva",
+    nome_input    = st.text_input("Nome completo", value="Osvaldo Holanda",
+                                   placeholder="Ex: João Silva",
                                    help="Preenchido no campo Nome do formulário")
-    id_input      = st.text_input("ID do Funcionário", placeholder="Ex: 12345")
-    telefone_input = st.text_input("Telefone", placeholder="Ex: 85999999999")
+    id_input      = st.text_input("ID do Funcionário", value="2445201",
+                                   placeholder="Ex: 12345")
+    telefone_input = st.text_input("Telefone", value="85988449973",
+                                   placeholder="Ex: 85999999999")
 
     st.divider()
     st.subheader("⚙️ Configurações Avançadas")
