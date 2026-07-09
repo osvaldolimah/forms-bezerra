@@ -22,12 +22,43 @@ MEUS_BAIRROS = [
     "Rodolfo Teofilo", "São Gerardo", "Bom Futuro", "Vila União"
 ]
 
+# Ordem de prioridade de envio
+BAIRROS_PREFERIDOS = [
+    "Parque Iracema", "Cajazeiras", "Cambeba", "Damas",
+    "Itaperi", "Guararapes", "Luciano Cavalcante", "Bom Futuro", "Dias Macedo", "Parreão",
+    "Jardim América", "Aerolândia", "Boa Vista", "São Gerardo", "Monte Castelo"
+]
+
 def remover_acentos(texto):
     """Normaliza o texto removendo acentos e convertendo para minúsculas."""
     if not texto:
         return ""
     nfkd_form = unicodedata.normalize('NFKD', texto)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).lower().strip()
+
+
+def ordenar_rotas_por_preferencia(rotas):
+    """Ordena as rotas pela prioridade de bairros preferidos."""
+    bairros_pref_norm = {remover_acentos(b): idx for idx, b in enumerate(BAIRROS_PREFERIDOS)}
+    rotas_preferidas = []
+    rotas_restantes = []
+
+    for rota in rotas:
+        rota_norm = remover_acentos(rota)
+        prioridade = None
+
+        for bairro_norm, idx in bairros_pref_norm.items():
+            if bairro_norm in rota_norm:
+                prioridade = idx
+                break
+
+        if prioridade is None:
+            rotas_restantes.append(rota)
+        else:
+            rotas_preferidas.append((prioridade, rota))
+
+    rotas_preferidas.sort(key=lambda x: x[0])
+    return [rota for _, rota in rotas_preferidas] + rotas_restantes
 
 def safe_click(driver, element):
     """Garante o clique via JavaScript para evitar intercepções."""
@@ -40,7 +71,7 @@ def safe_click(driver, element):
 
 def preencher_input(driver, wait, index, texto):
     """Localiza o input pelo índice e realiza o preenchimento seguro."""
-    xpath_inputs = "//input[@type='text' or @type='number']"
+    xpath_inputs = "//textarea | //input[(@type='text' or @type='number') and not(@type='hidden')]"
 
     wait.until(
         lambda d: len([el for el in d.find_elements(By.XPATH, xpath_inputs) if el.is_displayed()]) > index
@@ -145,6 +176,11 @@ if __name__ == "__main__":
     lista_de_rotas = obter_rotas_disponiveis(url_dia)
     
     if lista_de_rotas:
+        lista_de_rotas = ordenar_rotas_por_preferencia(lista_de_rotas)
+        print("\nOrdem de envio priorizada:")
+        for idx, rota in enumerate(lista_de_rotas, 1):
+            print(f"{idx:02d}. {rota}")
+
         print(f"\nIniciando {len(lista_de_rotas)} envios...")
         for r in lista_de_rotas:
             enviar_formulario(url_dia, r)
