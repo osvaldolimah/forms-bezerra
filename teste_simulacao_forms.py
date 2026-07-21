@@ -21,7 +21,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 
 DEFAULT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfCSutIeJrY-AOm7jz3ImNq5hFEBl7SSJmnkVNV5mBNFXUgFA/viewform"
-DEFAULT_NOME = "Tiago Bezerra"
+DEFAULT_NOME = "Thiago Bezerra"
 DEFAULT_ID_FUNC = "2359946"
 DEFAULT_TELEFONE = "85988299118"
 
