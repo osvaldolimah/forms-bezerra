@@ -89,7 +89,7 @@ BAIRROS_DEFAULT = [
 "Praia do Futuro II", "Prefeito José Walter", "Quintino Cunha", "Rodolfo Teófilo", "Sabiaguaba",
 "Salinas", "Santa Maria", "São Bento", "São Gerardo", "São João do Tauape",
 "Serrinha", "Siqueira", "Varjota", "Vicente Pinzón", "Vila Ellery",
-"Vila União", "Vila Velha", "Parque Iracema"
+"Vila União", "Vila Velha", "Parque Iracema", "Cocó"
 ]
 
 BAIRROS_PREFERIDOS_DEFAULT = [
