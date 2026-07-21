@@ -7,6 +7,7 @@ import unicodedata
 import platform
 import subprocess
 import traceback
+from datetime import date
 from typing import List
 from urllib.parse import urlparse
 
@@ -24,6 +25,24 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ==================== DATA DE VENCIMENTO ====================
+# Altere esta data para definir um novo vencimento.
+# Formato: date(Ano, Mês, Dia)
+DATA_VENCIMENTO = date(2026, 8, 20)
+
+def verificar_validade():
+    """Verifica se a data de hoje ultrapassou a data de vencimento."""
+    hoje = date.today()
+    if hoje > DATA_VENCIMENTO:
+        st.error(f"A licença de uso desta automação expirou em {DATA_VENCIMENTO.strftime('%d/%m/%Y')}.")
+        st.warning("Por favor, entre em contato com o desenvolvedor para renovar o acesso.")
+        st.stop()
+    else:
+        dias_restantes = (DATA_VENCIMENTO - hoje).days
+        st.sidebar.info(f"Licença válida até {DATA_VENCIMENTO.strftime('%d/%m/%Y')}.")
+        if dias_restantes <= 7:
+            st.sidebar.warning(f"Atenção: A licença expira em {dias_restantes} dia(s).")
 
 # ==================== CSS CUSTOMIZADO ====================
 st.markdown("""
@@ -693,6 +712,9 @@ def enviar_formulario(
 with st.sidebar:
     st.title("📋 Automação Forms")
     st.divider()
+    
+    # Executa a verificação de validade aqui para exibir na sidebar
+    verificar_validade()
 
     st.subheader("👤 Dados do Funcionário")
     nome_input    = st.text_input("Nome completo", value="Tiago Bezerra",
