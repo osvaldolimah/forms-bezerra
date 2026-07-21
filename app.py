@@ -76,9 +76,9 @@ BAIRROS_DEFAULT = [
 ]
 
 BAIRROS_PREFERIDOS_DEFAULT = [
-    "Parque Iracema", "Cajazeiras", "Cambeba", "Damas",
-    "Itaperi", "Guararapes", "Luciano Cavalcante", "Bom Futuro", "Dias Macedo", "Parreão",
-    "Jardim América", "Aerolândia", "Boa Vista", "São Gerardo", "Monte Castelo"
+    "Serrinha", "Pici", "Bela Vista", "Jardim America",
+    "Itaperi", "Fatima", "Vila União", "Bom Futuro", "Dias Macedo", "Parreão",
+    "Parque Dois Irmãos", "Parque 2 irmãos", "Benfica", "Damas", "Panamericano"
 ]
 
 # ==================== SESSION STATE ====================
