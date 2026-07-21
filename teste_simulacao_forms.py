@@ -21,9 +21,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 
 DEFAULT_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfCSutIeJrY-AOm7jz3ImNq5hFEBl7SSJmnkVNV5mBNFXUgFA/viewform"
-DEFAULT_NOME = "Francisco Osvaldo Lima Holanda"
-DEFAULT_ID_FUNC = "2445201"
-DEFAULT_TELEFONE = "85988449973"
+DEFAULT_NOME = "Tiago Bezerra"
+DEFAULT_ID_FUNC = "2359946"
+DEFAULT_TELEFONE = "85988299118"
 
 
 def parse_args() -> argparse.Namespace:

@@ -695,12 +695,12 @@ with st.sidebar:
     st.divider()
 
     st.subheader("👤 Dados do Funcionário")
-    nome_input    = st.text_input("Nome completo", value="Osvaldo Holanda",
+    nome_input    = st.text_input("Nome completo", value="Tiago Bezerra",
                                    placeholder="Ex: João Silva",
                                    help="Preenchido no campo Nome do formulário")
-    id_input      = st.text_input("ID do Funcionário", value="2445201",
+    id_input      = st.text_input("ID do Funcionário", value="2359946",
                                    placeholder="Ex: 12345")
-    telefone_input = st.text_input("Telefone", value="85988449973",
+    telefone_input = st.text_input("Telefone", value="85988299118",
                                    placeholder="Ex: 85999999999")
 
     st.divider()
