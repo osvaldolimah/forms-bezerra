@@ -1,8 +1,14 @@
 import logging
 import os
+import sys
+import tempfile
 import datetime
 import time
 import unicodedata
+import platform
+import subprocess
+import traceback
+from datetime import date
 from typing import List
 from urllib.parse import urlparse
 
@@ -21,16 +27,23 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ==================== VERIFICAÇÃO DE LICENÇA ====================
-# Configure aqui a data de vencimento (ANO, MÊS, DIA)
-# Exemplo atual: 5 de Julho de 2026 (30 dias)
-DATA_EXPIRACAO = datetime.date(2026, 10, 8)
-DATA_ATUAL = datetime.date.today()
+# ==================== DATA DE VENCIMENTO ====================
+# Altere esta data para definir um novo vencimento.
+# Formato: date(Ano, Mês, Dia)
+DATA_VENCIMENTO = date(2026, 10, 8)
 
-if DATA_ATUAL > DATA_EXPIRACAO:
-    st.error("🔒 **Acesso Expirado!**")
-    st.warning(f"Sua licença venceu no dia {DATA_EXPIRACAO.strftime('%d/%m/%Y')}. Por favor, entre em contato para renovar o acesso mensal.")
-    st.stop()  # Isso impede que o restante do site carregue
+def verificar_validade():
+    """Verifica se a data de hoje ultrapassou a data de vencimento."""
+    hoje = date.today()
+    if hoje > DATA_VENCIMENTO:
+        st.error(f"A licença de uso desta automação expirou em {DATA_VENCIMENTO.strftime('%d/%m/%Y')}.")
+        st.warning("Por favor, entre em contato com o desenvolvedor para renovar o acesso.")
+        st.stop()
+    else:
+        dias_restantes = (DATA_VENCIMENTO - hoje).days
+        st.sidebar.info(f"Licença válida até {DATA_VENCIMENTO.strftime('%d/%m/%Y')}.")
+        if dias_restantes <= 7:
+            st.sidebar.warning(f"Atenção: A licença expira em {dias_restantes} dia(s).")
 
 # ==================== CSS CUSTOMIZADO ====================
 st.markdown("""
@@ -55,33 +68,35 @@ MAX_TENTATIVAS = 2
 INTERVALO_RETRY = 2
 
 BAIRROS_DEFAULT = [
-    "Aerolândia", "Aeroporto", "Aldeota", "Alto da Balança", "Amadeu Furtado", 
-    "Ancuri", "Antônio Bezerra", "Autran Nunes", "Barra do Ceará", "Barroso", 
-    "Bela Vista", "Benfica", "Bom Futuro", "Bom Jardim", "Bonsucesso", 
-    "Cais do Porto", "Cambeba", "Canindezinho", "Carlito Pamplona", "Castelão", 
-    "Centro", "Cidade dos Funcionários", "Cidade Nova", "Coaçu", "Cocó", 
-    "Conjunto Ceará I", "Conjunto Ceará II", "Conjunto Esperança", "Couto Fernandes", "Curió", 
-    "Damas", "De Lourdes", "Dias Macedo", "Dom Lustosa", "Edson Queiroz", 
-    "Engenheiro Luciano Cavalcante", "Farias Brito", "Fátima", "Floresta", "Genibaú", 
-    "Granja Lisboa", "Granja Portugal", "Guajeru", "Guararapes", "Henrique Jorge", 
-    "Itaoca", "Itaperi", "Jacarecanga", "Jangurussu", "Jardim América", 
-    "Jardim Cearense", "Jardim das Oliveiras", "Jardim Iracema", "José Bonifácio", "José de Alencar", 
-    "Manuel Sátiro", "Maraponga", "Meireles", "Messejana", "Mondubim", 
-    "Monte Castelo", "Montese", "Moura Brasil", "Mucuripe", "Novo Mondubim", 
-    "Olavo Bilac", "Panamericano", "Papicu", "Parangaba", "Parque Araxá", 
-    "Parque Dois Irmãos", "Parque Iracema", "Parque Manibura", "Parque Presidente Vargas", "Parque Santa Maria", 
-    "Parque Santa Rosa", "Parquelândia", "Parreão", "Passaré", "Paupina", 
-    "Pedras", "Pici", "Pirambu", "Planalto Ayrton Senna", "Praia de Iracema", 
-    "Praia do Futuro", "Prefeito José Walter", "Quintino Cunha", "Rodolfo Teófilo", "Sabiaguaba", 
-    "Salinas", "Santa Maria", "Santa Rosa", "São Bento", "São Gerardo", 
-    "São João do Tauape", "Sapiranga/Coité", "Serrinha", "Siqueira", "Varjota", 
-    "Vicente Pinzón", "Vila Ellery", "Vila Manoel Sátiro", "Vila Peri", "Vila União", 
-    "Vila Velha"
+    "Aerolândia", "Aeroporto", "Aldeota", "Alto da Balança", "Álvaro Weyne",
+    "Amadeu Furtado", "Ancuri", "Antônio Bezerra", "Autran Nunes", "Barra do Ceará",
+    "Barroso", "Bela Vista", "Benfica", "Boa Vista", "Bom Futuro",
+    "Bom Jardim", "Bonsucesso", "Cais do Porto", "Cajazeiras", "Cambeba",
+    "Canindezinho", "Carlito Pamplona", "Castelão", "Centro", "Cidade 2000",
+    "Cidade dos Funcionários", "Coaçu", "Conjunto Ceará I", "Conjunto Ceará II", "Conjunto Esperança",
+    "Conjunto Palmeiras", "Couto Fernandes", "Cristo Redentor", "Curió", "Damas",
+    "De Lourdes", "Demócrito Rocha", "Dendê", "Dias Macedo", "Dionísio Torres",
+    "Dom Lustosa", "Edson Queiroz", "Engenheiro Luciano Cavalcante", "Farias Brito", "Fatima",
+    "Floresta", "Genibaú", "Granja Lisboa", "Granja Portugal", "Guajerú",
+    "Guararapes", "Henrique Jorge", "Itaoca", "Itaperi", "Jacarecanga",
+    "Jangurussu", "Jardim America", "Jardim Cearense", "Jardim das Oliveiras", "Jardim Guanabara",
+    "João XXIII", "Joaquim Távora", "Jóquei Clube", "José de Alencar", "Lagoa Redonda",
+    "Manuel Dias Branco", "Manoel Sátiro", "Maraponga", "Meireles", "Messejana",
+    "Mondubim", "Montese", "Moura Brasil", "Mucuripe", "Novo Mondubim",
+    "Olavo Oliveira", "Padre Andrade", "Panamericano", "Papicu", "Parque Araxá",
+    "Parque Dois Irmãos", "Parque 2 irmãos", "Parque Manibura", "Parque Santa Rosa", "Parque São José",
+    "Parquelândia", "Parreão", "Passaré", "Paupina", "Pedras",
+    "Pici", "Pirambu", "Planalto Ayrton Senna", "Praia de Iracema", "Praia do Futuro I",
+    "Praia do Futuro II", "Prefeito José Walter", "Quintino Cunha", "Rodolfo Teófilo", "Sabiaguaba",
+    "Salinas", "Santa Maria", "São Bento", "São Gerardo", "São João do Tauape",
+    "Serrinha", "Siqueira", "Varjota", "Vicente Pinzón", "Vila Ellery",
+    "Vila União", "Vila Velha", "Parque Iracema", "Cocó"
 ]
 
 BAIRROS_PREFERIDOS_DEFAULT = [
-    "Parque Iracema", "Cajazeiras", "Cambeba", "Damas",
-    "Itaperi", "Guararapes", "Luciano Cavalcante"
+    "Serrinha", "Pici", "Bela Vista", "Jardim America",
+    "Itaperi", "Fatima", "Vila União", "Bom Futuro", "Dias Macedo", "Parreão",
+    "Parque Dois Irmãos", "Parque 2 irmãos", "Benfica", "Damas", "Panamericano"
 ]
 
 # ==================== SESSION STATE ====================
@@ -113,6 +128,66 @@ def make_log_fn(placeholder):
         content = "\n".join(st.session_state.logs[-100:])  # Últimas 100 linhas
         placeholder.markdown(f'<div class="log-box">{content}</div>', unsafe_allow_html=True)
     return log
+
+
+def _versao_binario(caminho: str) -> str:
+    try:
+        resultado = subprocess.run(
+            [caminho, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        saida = (resultado.stdout or resultado.stderr or "").strip()
+        return saida or "versão indisponível"
+    except Exception as exc:
+        return f"erro ao consultar versão: {exc}"
+
+
+def _coletar_diagnostico_ambiente(chrome_path: str | None, chromedriver_path: str | None) -> List[str]:
+    dados = [
+        f"SO: {platform.platform()}",
+        f"Python: {platform.python_version()}",
+        f"Executável Python: {sys.executable}",
+        f"Chrome detectado: {chrome_path or 'não encontrado'}",
+        f"ChromeDriver detectado: {chromedriver_path or 'não encontrado'}",
+    ]
+
+    if chrome_path:
+        dados.append(f"Chrome versão: {_versao_binario(chrome_path)}")
+    if chromedriver_path:
+        dados.append(f"ChromeDriver versão: {_versao_binario(chromedriver_path)}")
+
+    return dados
+
+
+def _log_diagnostico_ambiente(log, chrome_path: str | None, chromedriver_path: str | None) -> None:
+    log("Diagnóstico do ambiente Chrome:", "MAP")
+    for linha in _coletar_diagnostico_ambiente(chrome_path, chromedriver_path):
+        log(f"  {linha}", "MAP")
+
+
+def _detectar_binarios_chrome() -> tuple[str | None, str | None]:
+    chrome_paths = [
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/snap/bin/chromium",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ]
+
+    chromedriver_paths = [
+        "/usr/bin/chromedriver",
+        "/usr/local/bin/chromedriver",
+        r"C:\chromedriver.exe",
+    ]
+
+    chrome_path = next((caminho for caminho in chrome_paths if os.path.exists(caminho)), None)
+    chromedriver_path = next((caminho for caminho in chromedriver_paths if os.path.exists(caminho)), None)
+    return chrome_path, chromedriver_path
 
 # ==================== FUNÇÕES AUXILIARES ====================
 def remover_acentos(texto: str) -> str:
@@ -269,86 +344,144 @@ def ordenar_rotas_por_preferencia(rotas: List[str], bairros_preferidos: List[str
     rotas_preferidas.sort(key=lambda x: x[0])
     return [r for _, r in rotas_preferidas] + rotas_restantes
 
+
+def _criar_opcoes_chrome(headless_arg: str, conservador: bool = False) -> webdriver.ChromeOptions:
+    options = webdriver.ChromeOptions()
+
+    options.add_argument(headless_arg)
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-translate")
+
+    if conservador:
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-sync")
+    else:
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument(
+            "--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        options.add_argument("--no-first-run")
+        options.add_argument("--no-default-browser-check")
+
+    return options
+
+
+def _lista_argumentos_chrome(headless_arg: str, conservador: bool = False) -> List[str]:
+    args = [
+        headless_arg,
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--window-size=1920,1080",
+        "--disable-translate",
+    ]
+
+    if conservador:
+        args.extend([
+            "--disable-extensions",
+            "--disable-sync",
+        ])
+    else:
+        args.extend([
+            "--disable-blink-features=AutomationControlled",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ])
+
+    return args
+
+
+def _criar_webdriver(options: webdriver.ChromeOptions, chromedriver_path: str | None):
+    log_file = os.path.join(tempfile.gettempdir(), "chromedriver-streamlit.log")
+    service = Service(
+        executable_path=chromedriver_path,
+        log_output=log_file,
+    ) if chromedriver_path else Service(log_output=log_file)
+
+    try:
+        if chromedriver_path:
+            return webdriver.Chrome(service=service, options=options)
+        return webdriver.Chrome(service=service, options=options)
+    except Exception:
+        try:
+            logging.error("ChromeDriver log salvo em: %s", log_file)
+            if os.path.exists(log_file):
+                with open(log_file, "r", encoding="utf-8", errors="ignore") as handle:
+                    logging.error("ChromeDriver log bruto:\n%s", handle.read()[-8000:])
+        except Exception:
+            pass
+        raise
+
 # ==================== SELENIUM ====================
 def criar_driver() -> webdriver.Chrome:
     """
     Cria o ChromeDriver com suporte a ambiente local e Streamlit Cloud.
     Headless é sempre ativado (obrigatório em ambiente cloud/server).
     """
-    options = webdriver.ChromeOptions()
-
-    # ── Modo headless ─────────────────────────────────────────────────────────
-    options.add_argument("--headless=new")
-
-    # ── Flags essenciais para ambientes container / cloud ─────────────────────
-    options.add_argument("--no-sandbox")               # Sem sandbox do kernel
-    options.add_argument("--disable-setuid-sandbox")   # Sandbox extra desativada
-    options.add_argument("--disable-dev-shm-usage")    # Usa /tmp em vez de /dev/shm
-
-    # ── GPU / renderização (desabilitar para estabilidade) ────────────────────
-    options.add_argument("--disable-gpu")
-
-    # ── Janela padrão ─────────────────────────────────────────────────────────
-    options.add_argument("--window-size=1920,1080")
-    
-    # ── Estabilidade em container / headless ──────────────────────────────────
-    options.add_argument("--disable-blink-features=AutomationControlled")  # Evita detecção
-    options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-    options.add_argument("--no-first-run")              # Skip first-run tasks
-    options.add_argument("--no-default-browser-check")  # Skip browser check
-    options.add_argument("--disable-browser-side-navigation")
-    options.add_argument("--disable-client-side-phishing-detection")
-
-    # Tenta encontrar Chrome/Chromium instalado no sistema
-    CHROME_PATHS = [
-        "/usr/bin/chromium",           # Streamlit Cloud (Debian)
-        "/usr/bin/chromium-browser",   # Outras distribuições
-        "/usr/bin/google-chrome",
-        "/usr/bin/google-chrome-stable",
-        "/snap/bin/chromium",          # Snap packages
-    ]
-    
-    CHROMEDRIVER_PATHS = [
-        "/usr/bin/chromedriver",
-        "/usr/local/bin/chromedriver",
-    ]
-
-    # Detecta Chrome/Chromium disponível
-    chrome_path = next((p for p in CHROME_PATHS if os.path.exists(p)), None)
-    chromedriver_path = next((p for p in CHROMEDRIVER_PATHS if os.path.exists(p)), None)
+    chrome_path, chromedriver_path = _detectar_binarios_chrome()
 
     if chrome_path:
-        options.binary_location = chrome_path
         logging.info(f"Chrome encontrado em: {chrome_path}")
 
-    # Tenta criar driver com o que está disponível
-    try:
-        if chromedriver_path:
-            # Usar chromedriver explícito se encontrado
-            return webdriver.Chrome(service=Service(chromedriver_path), options=options)
-        else:
-            # Deixar Selenium encontrar automaticamente ou usar webdriver-manager
-            return webdriver.Chrome(options=options)
-    except Exception as e:
-        # Fallback: tentar com webdriver-manager
+    logging.info("Iniciando diagnóstico de ambiente do Chrome")
+    for linha in _coletar_diagnostico_ambiente(chrome_path, chromedriver_path):
+        logging.info(linha)
+
+    tentativas = [
+        ("--headless=new", False),
+        ("--headless", False),
+        ("--headless=chrome", False),
+        ("--headless", True),
+    ]
+    erros = []
+
+    for headless_arg, conservador in tentativas:
+        options = _criar_opcoes_chrome(headless_arg, conservador=conservador)
+        if chrome_path:
+            options.binary_location = chrome_path
+
         try:
-            from webdriver_manager.chrome import ChromeDriverManager
-            logging.getLogger('webdriver_manager').setLevel(logging.WARNING)
-            service = Service(ChromeDriverManager().install())
-            return webdriver.Chrome(service=service, options=options)
-        except Exception as e2:
-            raise RuntimeError(
-                f"❌ Não foi possível inicializar o ChromeDriver.\n"
-                f"Erro 1: {e}\n"
-                f"Erro 2: {e2}\n\n"
-                f"📝 Solução para Streamlit Cloud:\n"
-                f"  1. Certifique-se que packages.txt contém 'chromium' e 'chromium-driver'\n"
-                f"  2. Clique em 'Redeploy' (não apenas reload)\n"
-                f"  3. Aguarde a instalação completar\n\n"
-                f"💻 Solução Local:\n"
-                f"  1. Instale Google Chrome\n"
-                f"  2. Adicione webdriver-manager em requirements.txt"
+            return _criar_webdriver(options, chromedriver_path)
+        except Exception as e:
+            erros.append(e)
+            logging.warning(
+                "Falha ao iniciar Chrome com %s (%s): %s",
+                headless_arg,
+                "conservador" if conservador else "padrão",
+                str(e)[:200],
             )
+            logging.warning("Argumentos usados: %s", _lista_argumentos_chrome(headless_arg, conservador=conservador))
+            logging.warning("Stacktrace da tentativa:\n%s", traceback.format_exc())
+
+    try:
+        from webdriver_manager.chrome import ChromeDriverManager
+
+        logging.getLogger('webdriver_manager').setLevel(logging.WARNING)
+        options = _criar_opcoes_chrome("--headless", conservador=True)
+        if chrome_path:
+            options.binary_location = chrome_path
+
+        service = Service(ChromeDriverManager().install())
+        return webdriver.Chrome(service=service, options=options)
+    except Exception as e2:
+        erros.append(e2)
+        logging.error("Falha final ao inicializar ChromeDriver:\n%s", traceback.format_exc())
+        raise RuntimeError(
+            f"❌ Não foi possível inicializar o ChromeDriver.\n"
+            f"Erro 1: {erros[0]}\n"
+            f"Erro 2: {erros[1] if len(erros) > 1 else e2}\n\n"
+            f"📝 Solução para Streamlit Cloud:\n"
+            f"  1. Certifique-se que packages.txt contém 'chromium' e 'chromium-driver'\n"
+            f"  2. Clique em 'Redeploy' (não apenas reload)\n"
+            f"  3. Aguarde a instalação completar\n\n"
+            f"💻 Solução Local:\n"
+            f"  1. Instale Google Chrome\n"
+            f"  2. Adicione webdriver-manager em requirements.txt"
+        )
 
 
 def obter_rotas_disponiveis(
@@ -358,6 +491,8 @@ def obter_rotas_disponiveis(
     driver = None
     try:
         log("Iniciando ChromeDriver para mapeamento...", "MAP")
+        chrome_path, chromedriver_path = _detectar_binarios_chrome()
+        _log_diagnostico_ambiente(log, chrome_path, chromedriver_path)
         driver = criar_driver()
         log("✅ ChromeDriver iniciado", "MAP")
         
@@ -474,9 +609,8 @@ def obter_rotas_disponiveis(
         return rotas_encontradas
 
     except Exception as e:
-        log(f"❌ Erro no mapeamento: {str(e)[:120]}", "ERRO")
-        import traceback
-        log(f"Stacktrace: {traceback.format_exc()[:200]}", "DEBUG")
+        log(f"❌ Erro no mapeamento: {type(e).__name__}: {str(e)[:180]}", "ERRO")
+        log(f"Stacktrace completo:\n{traceback.format_exc()}", "ERRO")
         return []
     finally:
         if driver:
@@ -494,6 +628,8 @@ def enviar_formulario(
     driver = None
     try:
         log(f"[Tentativa {tentativa}/{MAX_TENTATIVAS}] Iniciando envio: {rota}", "PROC")
+        chrome_path, chromedriver_path = _detectar_binarios_chrome()
+        _log_diagnostico_ambiente(log, chrome_path, chromedriver_path)
         driver = criar_driver()
         log("  ✅ ChromeDriver criado", "DEBUG")
         
@@ -566,9 +702,8 @@ def enviar_formulario(
         return True
 
     except Exception as e:
-        log(f"❌ Falha no envio de '{rota}': {str(e)[:100]}", "ERRO")
-        import traceback
-        log(f"   Stacktrace: {traceback.format_exc()[:150]}", "DEBUG")
+        log(f"❌ Falha no envio de '{rota}': {type(e).__name__}: {str(e)[:180]}", "ERRO")
+        log(f"   Stacktrace completo:\n{traceback.format_exc()}", "ERRO")
         
         if tentativa < MAX_TENTATIVAS:
             log(f"🔁 Aguardando {INTERVALO_RETRY}s antes de retry...", "RETRY")
@@ -595,19 +730,25 @@ def enviar_formulario(
 with st.sidebar:
     st.title("📋 Automação Forms")
     
-    dias_restantes = (DATA_EXPIRACAO - DATA_ATUAL).days
+    dias_restantes = (DATA_VENCIMENTO - date.today()).days
     if dias_restantes <= 5:
         st.warning(f"⚠️ Licença expira em {dias_restantes} dias.")
     else:
         st.success(f"✅ Licença ativa: {dias_restantes} dias restantes.")
         
     st.divider()
+    
+    # Executa a verificação de validade aqui para exibir na sidebar
+    verificar_validade()
 
     st.subheader("👤 Dados do Funcionário")
-    nome_input    = st.text_input("Nome completo", value="Thiago Bezerra", disabled=True, placeholder="Ex: João Silva",
+    nome_input    = st.text_input("Nome completo", value="Thiago Bezerra",
+                                   placeholder="Ex: João Silva",
                                    help="Preenchido no campo Nome do formulário")
-    id_input      = st.text_input("ID do Funcionário", value="2359946", disabled=True, placeholder="Ex: 12345")
-    telefone_input = st.text_input("Telefone", value="85988299118", disabled=True, placeholder="Ex: 85999999999")
+    id_input      = st.text_input("ID do Funcionário", value="2359946",
+                                   placeholder="Ex: 12345")
+    telefone_input = st.text_input("Telefone", value="85988299118",
+                                   placeholder="Ex: 85999999999")
 
     st.divider()
     st.subheader("⚙️ Configurações Avançadas")
@@ -623,173 +764,178 @@ with st.sidebar:
 
 # ── Main ──────────────────────────────────────────────────────
 st.title("📋 Automação Google Forms")
-st.markdown("Preenche e envia formulários de escala automaticamente com base nos bairros configurados.")
 
-# ── URL ───────────────────────────────────────────────────────
-url_input = st.text_input(
-    "🔗 URL do Formulário Google",
-    placeholder="https://docs.google.com/forms/d/e/.../viewform",
-    label_visibility="visible"
-)
+tab_escala = st.tabs(["Formulário de Escala"])[0]
 
-# ── Configuração de Bairros ───────────────────────────────────
-with st.expander("🏘️ Configuração de Bairros", expanded=False):
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown("**Meus Bairros** *(um por linha)*")
-        bairros_txt = st.text_area(
-            "meus_bairros", label_visibility="hidden",
-            value="\n".join(BAIRROS_DEFAULT), height=220,
-            help="Bairros que você atende. O formulário será enviado apenas para rotas que contenham esses bairros."
-        )
-    with col_b:
-        st.markdown("**Ordem de Preferência** *(um por linha)*")
-        pref_txt = st.text_area(
-            "bairros_pref", label_visibility="hidden",
-            value="\n".join(BAIRROS_PREFERIDOS_DEFAULT), height=220,
-            help="Bairros mais prioritários ficam no topo. Os demais ficam ao final da fila."
-        )
+with tab_escala:
+    st.markdown("Preenche e envia formulários de escala automaticamente com base nos bairros configurados.")
 
-meus_bairros   = [b.strip() for b in bairros_txt.splitlines() if b.strip()]
-bairros_pref   = [b.strip() for b in pref_txt.splitlines() if b.strip()]
+    # ── URL ───────────────────────────────────────────────────────
+    url_input = st.text_input(
+        "🔗 URL do Formulário Google",
+        placeholder="https://docs.google.com/forms/d/e/.../viewform",
+        label_visibility="visible",
+        key="url_escala"
+    )
 
-st.divider()
-
-# ── Fase 1: Mapear Rotas ──────────────────────────────────────
-col1, col2, col3 = st.columns([2, 2, 4])
-
-with col1:
-    btn_mapear = st.button("🗺️ Mapear Rotas", use_container_width=True, type="secondary")
-
-with col2:
-    btn_limpar = st.button("🔄 Limpar", use_container_width=True)
-
-if btn_limpar:
-    st.session_state.rotas_disponiveis = []
-    st.session_state.rotas_selecionadas = []
-    st.session_state.resultado = {}
-    st.session_state.logs = []
-    st.session_state.fase = "idle"
-    st.rerun()
-
-# Validações antes de mapear
-if btn_mapear:
-    erros = []
-    if not nome_input.strip():    erros.append("Nome do funcionário")
-    if not id_input.strip():      erros.append("ID do funcionário")
-    if not telefone_input.strip(): erros.append("Telefone")
-    if not url_input.strip():     erros.append("URL do formulário")
-    elif not validar_url(url_input.strip()):
-        erros.append("URL inválida (deve ser docs.google.com/forms ou forms.gle)")
-
-    if erros:
-        st.error("Preencha os campos obrigatórios: " + " · ".join(erros))
-    else:
-        st.session_state.logs = []
-        st.session_state.rotas_disponiveis = []
-        st.session_state.fase = "mapeando"
-
-        log_placeholder = st.empty()
-        log = make_log_fn(log_placeholder)
-
-        with st.spinner("Mapeando rotas disponíveis no formulário..."):
-            rotas = obter_rotas_disponiveis(
-                url_input.strip(), nome_input.strip(),
-                id_input.strip(), meus_bairros, log
+    # ── Configuração de Bairros ───────────────────────────────────
+    with st.expander("🏘️ Configuração de Bairros", expanded=False):
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("**Meus Bairros** *(um por linha)*")
+            bairros_txt = st.text_area(
+                "meus_bairros", label_visibility="hidden",
+                value="\n".join(BAIRROS_DEFAULT), height=220,
+                help="Bairros que você atende. O formulário será enviado apenas para rotas que contenham esses bairros."
+            )
+        with col_b:
+            st.markdown("**Ordem de Preferência** *(um por linha)*")
+            pref_txt = st.text_area(
+                "bairros_pref", label_visibility="hidden",
+                value="\n".join(BAIRROS_PREFERIDOS_DEFAULT), height=220,
+                help="Bairros mais prioritários ficam no topo. Os demais ficam ao final da fila."
             )
 
-        if rotas:
-            rotas_ord = ordenar_rotas_por_preferencia(rotas, bairros_pref)
-            st.session_state.rotas_disponiveis = rotas_ord
-            st.session_state.rotas_selecionadas = rotas_ord.copy()
-            st.session_state.fase = "mapeado"
-            st.rerun()
-        else:
-            st.session_state.fase = "idle"
-            st.warning("Nenhuma rota compatível encontrada. Verifique a lista de bairros.")
-
-# ── Exibir rotas mapeadas + seleção ───────────────────────────
-if st.session_state.fase in ("mapeado", "concluido") and st.session_state.rotas_disponiveis:
-    st.success(f"✅ {len(st.session_state.rotas_disponiveis)} rota(s) encontrada(s)")
-
-    st.markdown("#### Selecione as rotas para envio:")
-    selecionadas = []
-    cols = st.columns(2)
-    for i, rota in enumerate(st.session_state.rotas_disponiveis):
-        status_icon = ""
-        if rota in st.session_state.resultado:
-            status_icon = " ✅" if st.session_state.resultado[rota] else " ❌"
-        checked = st.session_state.resultado.get(rota) is None  # Desmarca as que já foram processadas
-        with cols[i % 2]:
-            if st.checkbox(rota + status_icon, value=checked, key=f"rota_{i}"):
-                selecionadas.append(rota)
-
-    st.session_state.rotas_selecionadas = selecionadas
+    meus_bairros   = [b.strip() for b in bairros_txt.splitlines() if b.strip()]
+    bairros_pref   = [b.strip() for b in pref_txt.splitlines() if b.strip()]
 
     st.divider()
 
-    # ── Fase 2: Enviar Formulários ────────────────────────────
-    btn_enviar = st.button(
-        f"🚀 Enviar {len(selecionadas)} Formulário(s)",
-        type="primary", use_container_width=False,
-        disabled=len(selecionadas) == 0
-    )
+    # ── Fase 1: Mapear Rotas ──────────────────────────────────────
+    col1, col2, col3 = st.columns([2, 2, 4])
 
-    if btn_enviar:
-        if not nome_input.strip() or not id_input.strip() or not telefone_input.strip():
-            st.error("Credenciais incompletas na barra lateral.")
+    with col1:
+        btn_mapear = st.button("🗺️ Mapear Rotas", use_container_width=True, type="secondary")
+
+    with col2:
+        btn_limpar = st.button("🔄 Limpar", use_container_width=True)
+
+    if btn_limpar:
+        st.session_state.rotas_disponiveis = []
+        st.session_state.rotas_selecionadas = []
+        st.session_state.resultado = {}
+        st.session_state.logs = []
+        st.session_state.fase = "idle"
+        st.rerun()
+
+    # Validações antes de mapear
+    if btn_mapear:
+        erros = []
+        if not nome_input.strip():    erros.append("Nome do funcionário")
+        if not id_input.strip():      erros.append("ID do funcionário")
+        if not telefone_input.strip(): erros.append("Telefone")
+        if not url_input.strip():     erros.append("URL do formulário")
+        elif not validar_url(url_input.strip()):
+            erros.append("URL inválida (deve ser docs.google.com/forms ou forms.gle)")
+
+        if erros:
+            st.error("Preencha os campos obrigatórios: " + " · ".join(erros))
         else:
             st.session_state.logs = []
-            st.session_state.resultado = {}
-            st.session_state.fase = "enviando"
+            st.session_state.rotas_disponiveis = []
+            st.session_state.fase = "mapeando"
 
             log_placeholder = st.empty()
             log = make_log_fn(log_placeholder)
 
-            progresso = st.progress(0, text="Iniciando envios...")
-            total = len(selecionadas)
-            sucesso_count, falha_count = 0, 0
-
-            for idx, rota in enumerate(selecionadas, 1):
-                progresso.progress(
-                    (idx - 1) / total,
-                    text=f"[{idx}/{total}] Enviando: {rota}"
+            with st.spinner("Mapeando rotas disponíveis no formulário..."):
+                rotas = obter_rotas_disponiveis(
+                    url_input.strip(), nome_input.strip(),
+                    id_input.strip(), meus_bairros, log
                 )
-                log(f"[{idx}/{total}] Processando: {rota}", "PROC")
 
-                ok = enviar_formulario(
-                    url_input.strip(), rota,
-                    nome_input.strip(), id_input.strip(), telefone_input.strip(),
-                    log
-                )
-                st.session_state.resultado[rota] = ok
-
-                if ok:
-                    sucesso_count += 1
-                else:
-                    falha_count += 1
-
-                if idx < total:
-                    log(f"Aguardando {intervalo}s até próximo envio...", "WAIT")
-                    time.sleep(intervalo)
-
-            progresso.progress(1.0, text="Concluído!")
-            st.session_state.fase = "concluido"
-
-            # Resumo final
-            st.divider()
-            st.subheader("📊 Resumo Final")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Total Enviado", total)
-            c2.metric("✅ Sucessos", sucesso_count)
-            c3.metric("❌ Falhas", falha_count)
-
-            if falha_count == 0:
-                st.success("Todos os formulários foram enviados com sucesso! 🎉")
-            elif sucesso_count == 0:
-                st.error("Nenhum formulário foi enviado com sucesso. Verifique os logs.")
+            if rotas:
+                rotas_ord = ordenar_rotas_por_preferencia(rotas, bairros_pref)
+                st.session_state.rotas_disponiveis = rotas_ord
+                st.session_state.rotas_selecionadas = rotas_ord.copy()
+                st.session_state.fase = "mapeado"
+                st.rerun()
             else:
-                st.warning(f"{sucesso_count} enviado(s) com sucesso, {falha_count} com falha.")
+                st.session_state.fase = "idle"
+                st.warning("Nenhuma rota compatível encontrada. Verifique a lista de bairros.")
+
+    # ── Exibir rotas mapeadas + seleção ───────────────────────────
+    if st.session_state.fase in ("mapeado", "concluido") and st.session_state.rotas_disponiveis:
+        st.success(f"✅ {len(st.session_state.rotas_disponiveis)} rota(s) encontrada(s)")
+
+        st.markdown("#### Selecione as rotas para envio:")
+        selecionadas = []
+        cols = st.columns(2)
+        for i, rota in enumerate(st.session_state.rotas_disponiveis):
+            status_icon = ""
+            if rota in st.session_state.resultado:
+                status_icon = " ✅" if st.session_state.resultado[rota] else " ❌"
+            checked = st.session_state.resultado.get(rota) is None  # Desmarca as que já foram processadas
+            with cols[i % 2]:
+                if st.checkbox(rota + status_icon, value=checked, key=f"rota_{i}"):
+                    selecionadas.append(rota)
+
+        st.session_state.rotas_selecionadas = selecionadas
+
+        st.divider()
+
+        # ── Fase 2: Enviar Formulários ────────────────────────────
+        btn_enviar = st.button(
+            f"🚀 Enviar {len(selecionadas)} Formulário(s)",
+            type="primary", use_container_width=False,
+            disabled=len(selecionadas) == 0
+        )
+
+        if btn_enviar:
+            if not nome_input.strip() or not id_input.strip() or not telefone_input.strip():
+                st.error("Credenciais incompletas na barra lateral.")
+            else:
+                st.session_state.logs = []
+                st.session_state.resultado = {}
+                st.session_state.fase = "enviando"
+
+                log_placeholder = st.empty()
+                log = make_log_fn(log_placeholder)
+
+                progresso = st.progress(0, text="Iniciando envios...")
+                total = len(selecionadas)
+                sucesso_count, falha_count = 0, 0
+
+                for idx, rota in enumerate(selecionadas, 1):
+                    progresso.progress(
+                        (idx - 1) / total,
+                        text=f"[{idx}/{total}] Enviando: {rota}"
+                    )
+                    log(f"[{idx}/{total}] Processando: {rota}", "PROC")
+
+                    ok = enviar_formulario(
+                        url_input.strip(), rota,
+                        nome_input.strip(), id_input.strip(), telefone_input.strip(),
+                        log
+                    )
+                    st.session_state.resultado[rota] = ok
+
+                    if ok:
+                        sucesso_count += 1
+                    else:
+                        falha_count += 1
+
+                    if idx < total:
+                        log(f"Aguardando {intervalo}s até próximo envio...", "WAIT")
+                        time.sleep(intervalo)
+
+                progresso.progress(1.0, text="Concluído!")
+                st.session_state.fase = "concluido"
+
+                # Resumo final
+                st.divider()
+                st.subheader("📊 Resumo Final")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Total Enviado", total)
+                c2.metric("✅ Sucessos", sucesso_count)
+                c3.metric("❌ Falhas", falha_count)
+
+                if falha_count == 0:
+                    st.success("Todos os formulários foram enviados com sucesso! 🎉")
+                elif sucesso_count == 0:
+                    st.error("Nenhum formulário foi enviado com sucesso. Verifique os logs.")
+                else:
+                    st.warning(f"{sucesso_count} enviado(s) com sucesso, {falha_count} com falha.")
 
 # ── Log persistente (após execução) ──────────────────────────
 if st.session_state.logs and st.session_state.fase not in ("enviando",):

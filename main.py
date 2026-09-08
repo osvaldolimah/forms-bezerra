@@ -8,9 +8,9 @@ import time
 import unicodedata
 
 # --- DADOS ---
-NOME = "Francisco Osvaldo Lima Holanda"
-ID_FUNC = "2445201"
-TELEFONE = "85988449973"
+NOME = "Thiago Bezerra"
+ID_FUNC = "2359946"
+TELEFONE = "85988299118"
 
 # Lista atualizada de bairros
 MEUS_BAIRROS = [
