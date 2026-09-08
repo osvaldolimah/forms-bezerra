@@ -742,11 +742,10 @@ with st.sidebar:
     verificar_validade()
 
     st.subheader("👤 Dados do Funcionário")
-    nome_input    = st.text_input("Nome completo", value="Thiago Bezerra",
-                                   placeholder="Ex: João Silva",
-                                   help="Preenchido no campo Nome do formulário")
-    id_input      = st.text_input("ID do Funcionário", value="2359946",
-                                   placeholder="Ex: 12345")
+    nome_input = "Thiago Bezerra"
+    id_input = "2359946"
+    st.text(f"Nome: {nome_input}")
+    st.text(f"ID: {id_input}")
     telefone_input = st.text_input("Telefone", value="85988299118",
                                    placeholder="Ex: 85999999999")
 
