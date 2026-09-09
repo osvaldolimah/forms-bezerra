@@ -169,21 +169,33 @@ def _log_diagnostico_ambiente(log, chrome_path: str | None, chromedriver_path: s
 
 
 def _detectar_binarios_chrome() -> tuple[str | None, str | None]:
-    chrome_paths = [
-        "/usr/bin/chromium",
-        "/usr/bin/chromium-browser",
-        "/usr/bin/google-chrome",
-        "/usr/bin/google-chrome-stable",
-        "/snap/bin/chromium",
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-    ]
-
-    chromedriver_paths = [
-        "/usr/bin/chromedriver",
-        "/usr/local/bin/chromedriver",
-        r"C:\chromedriver.exe",
-    ]
+    is_cloud = os.environ.get("STREAMLIT_CLOUD") == "true" or os.environ.get("IS_STREAMLIT_CLOUD") == "true"
+    is_linux = platform.system() == "Linux"
+    
+    if is_cloud or is_linux:
+        chrome_paths = [
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+        ]
+        chromedriver_paths = [
+            "/usr/bin/chromedriver",
+            "/usr/local/bin/chromedriver",
+        ]
+    else:
+        chrome_paths = [
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/snap/bin/chromium",
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ]
+        chromedriver_paths = [
+            "/usr/bin/chromedriver",
+            "/usr/local/bin/chromedriver",
+            r"C:\chromedriver.exe",
+        ]
 
     chrome_path = next((caminho for caminho in chrome_paths if os.path.exists(caminho)), None)
     chromedriver_path = next((caminho for caminho in chromedriver_paths if os.path.exists(caminho)), None)
@@ -354,6 +366,8 @@ def _criar_opcoes_chrome(headless_arg: str, conservador: bool = False) -> webdri
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--disable-translate")
+    options.add_argument("--disable-features=VizDisplayCompositor")
+    options.add_argument("--remote-debugging-port=9222")
 
     if conservador:
         options.add_argument("--disable-extensions")
@@ -423,6 +437,8 @@ def criar_driver() -> webdriver.Chrome:
     Headless é sempre ativado (obrigatório em ambiente cloud/server).
     """
     chrome_path, chromedriver_path = _detectar_binarios_chrome()
+    is_linux = platform.system() == "Linux"
+    is_cloud = os.environ.get("STREAMLIT_CLOUD") == "true" or os.environ.get("IS_STREAMLIT_CLOUD") == "true"
 
     if chrome_path:
         logging.info(f"Chrome encontrado em: {chrome_path}")
@@ -456,6 +472,23 @@ def criar_driver() -> webdriver.Chrome:
             )
             logging.warning("Argumentos usados: %s", _lista_argumentos_chrome(headless_arg, conservador=conservador))
             logging.warning("Stacktrace da tentativa:\n%s", traceback.format_exc())
+
+    if is_linux or is_cloud:
+        try:
+            logging.info("Tentando com xvfb-run para ambiente Linux/Cloud...")
+            options = _criar_opcoes_chrome("--headless", conservador=True)
+            if chrome_path:
+                options.binary_location = chrome_path
+            
+            if chromedriver_path:
+                service = Service(executable_path=chromedriver_path, log_output=os.path.join(tempfile.gettempdir(), "chromedriver-streamlit.log"))
+            else:
+                service = Service(log_output=os.path.join(tempfile.gettempdir(), "chromedriver-streamlit.log"))
+            
+            return webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            erros.append(e)
+            logging.warning("Falha com xvfb-run: %s", str(e)[:200])
 
     try:
         from webdriver_manager.chrome import ChromeDriverManager
