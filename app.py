@@ -60,11 +60,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==================== CONSTANTES ====================
-TIMEOUT_PADRAO = 15
-TIMEOUT_ENVIO = 20
-INTERVALO_ENTRE_ENVIOS = 3
-MAX_TENTATIVAS = 2
-INTERVALO_RETRY = 2
+TIMEOUT_PADRAO = 8
+TIMEOUT_ENVIO = 10
+INTERVALO_ENTRE_ENVIOS = 1
+MAX_TENTATIVAS = 1
+INTERVALO_RETRY = 1
 
 BAIRROS_DEFAULT = [
     "Cambeba", "Guararapes", "Benfica", "Itaperi", "Rodolfo Teófilo", "Cajazeiras",
@@ -510,8 +510,6 @@ def obter_rotas_disponiveis(
     driver = None
     try:
         log("Iniciando ChromeDriver para mapeamento...", "MAP")
-        chrome_path, chromedriver_path = _detectar_binarios_chrome()
-        _log_diagnostico_ambiente(log, chrome_path, chromedriver_path)
         driver = criar_driver()
         log("✅ ChromeDriver iniciado", "MAP")
         
@@ -523,7 +521,6 @@ def obter_rotas_disponiveis(
         driver.get(url)
         log("✅ Página carregada", "MAP")
         
-        time.sleep(2)
         log("Aguardando dropdown de rotas...", "MAP")
         
         try:
@@ -535,7 +532,7 @@ def obter_rotas_disponiveis(
             log(f"⚠️ Erro com dropdown: {str(e)[:80]}", "AVISO")
             raise
             
-        time.sleep(2)
+        time.sleep(0.3)
         log("Extraindo opções do dropdown...", "MAP")
         
         try:
@@ -559,7 +556,7 @@ def obter_rotas_disponiveis(
 
         # Fechar dropdown
         driver.find_element(By.TAG_NAME, "body").click()
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         log(f"Mapeamento concluído — {len(rotas_encontradas)} rota(s) compatível(is)", "INFO")
         return rotas_encontradas
@@ -584,8 +581,6 @@ def enviar_formulario(
     driver = None
     try:
         log(f"[Tentativa {tentativa}/{MAX_TENTATIVAS}] Iniciando envio: {rota}", "PROC")
-        chrome_path, chromedriver_path = _detectar_binarios_chrome()
-        _log_diagnostico_ambiente(log, chrome_path, chromedriver_path)
         driver = criar_driver()
         log("  ✅ ChromeDriver criado", "DEBUG")
         
@@ -593,7 +588,7 @@ def enviar_formulario(
 
         log("  Navegando para formulário...", "DEBUG")
         driver.get(url)
-        time.sleep(2)
+        time.sleep(0.5)
         log("  ✅ Página carregada", "DEBUG")
 
         # Preencher NOME COMPLETO
@@ -612,7 +607,7 @@ def enviar_formulario(
         log("    ✅ Dropdown encontrado", "DEBUG")
         
         safe_click(driver, dropdown)
-        time.sleep(1)
+        time.sleep(0.2)
         log("    ✅ Dropdown aberto", "DEBUG")
         
         opcao = wait.until(EC.element_to_be_clickable(
@@ -621,7 +616,7 @@ def enviar_formulario(
         log(f"    ✅ Opção '{rota}' localizada", "DEBUG")
         
         safe_click(driver, opcao)
-        time.sleep(0.5)
+        time.sleep(0.1)
         log(f"    ✅ Opção '{rota}' selecionada", "DEBUG")
         
         # Selecionar "15 MINUTOS" (radio button com role=checkbox)
@@ -629,7 +624,7 @@ def enviar_formulario(
         radio_xpath = '//div[@role="checkbox" and @aria-label="15 MINUTOS"]'
         radio = wait.until(EC.element_to_be_clickable((By.XPATH, radio_xpath)))
         safe_click(driver, radio)
-        time.sleep(0.5)
+        time.sleep(0.1)
         log("    ✅ Tempo selecionado: 15 MINUTOS", "DEBUG")
         
         # Clicar em Enviar
@@ -640,47 +635,43 @@ def enviar_formulario(
         safe_click(driver, btn_enviar)
         log("  ✅ Formulário enviado (clique realizado)", "DEBUG")
         
-        # Aguarda confirmação de envio - múltiplas estratégias
-        time.sleep(3)
+        # Aguarda confirmação de envio - estratégia rápida
+        time.sleep(1)
         sucesso = False
         
-        # Estratégia 1: Procurar textos de sucesso comuns
-        success_texts = [
-            'registrada', 'agradecemos', 'enviado', 'resposta',
-            'confirmada', 'recebida', 'sucesso', 'obrigado',
-            'thank you', 'submitted', 'recorded', 'received'
-        ]
-        for texto in success_texts:
-            try:
-                wait.until(EC.presence_of_element_located((By.XPATH, f"//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{texto}')]")))
-                log(f"  ✅ Sucesso detectado por texto: '{texto}'", "OK")
+        # Estratégia 1: Verificar URL (mais rápido)
+        try:
+            current_url = driver.current_url
+            if "formResponse" in current_url or "viewform" not in current_url:
+                log(f"  ✅ Sucesso detectado: URL mudou", "OK")
                 sucesso = True
-                break
-            except:
-                continue
+        except:
+            pass
         
-        # Estratégia 2: Procurar link "Enviar outra resposta" (indicador confiável)
+        # Estratégia 2: Link "Enviar outra resposta" (rápido)
         if not sucesso:
             try:
                 wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(text(), 'Enviar outra resposta') or contains(text(), 'Submit another response')]")))
-                log("  ✅ Sucesso detectado: link 'Enviar outra resposta' encontrado", "OK")
+                log("  ✅ Sucesso detectado: link 'Enviar outra resposta'", "OK")
                 sucesso = True
             except:
                 pass
         
-        # Estratégia 3: Verificar se não está mais na página do formulário (URL mudou)
+        # Estratégia 3: Textos de sucesso (fallback)
         if not sucesso:
-            try:
-                current_url = driver.current_url
-                if "formResponse" in current_url or "viewform" not in current_url:
-                    log(f"  ✅ Sucesso detectado: URL mudou para {current_url[:80]}", "OK")
+            success_texts = ['registrada', 'agradecemos', 'enviado', 'resposta', 'confirmada', 'recebida', 'sucesso', 'obrigado', 'thank you', 'submitted', 'recorded', 'received']
+            for texto in success_texts:
+                try:
+                    wait.until(EC.presence_of_element_located((By.XPATH, f"//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{texto}')]")))
+                    log(f"  ✅ Sucesso detectado: '{texto}'", "OK")
                     sucesso = True
-            except:
-                pass
+                    break
+                except:
+                    continue
         
-        # Estratégia 4: Se clicou em Enviar sem erro, assumir sucesso (fallback)
+        # Fallback: assumir sucesso se clicou sem erro
         if not sucesso:
-            log("  ⚠️ Confirmação visual não detectada, mas envio prosseguiu sem erro - assumindo sucesso", "WARN")
+            log("  ⚠️ Assumindo sucesso (clique OK)", "WARN")
             sucesso = True
         
         log(f"✅ SUCESSO CONFIRMADO: {rota}", "OK")
