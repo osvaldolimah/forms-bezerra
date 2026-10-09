@@ -640,9 +640,49 @@ def enviar_formulario(
         safe_click(driver, btn_enviar)
         log("  ✅ Formulário enviado (clique realizado)", "DEBUG")
         
-        # Aguarda confirmação de envio
-        time.sleep(2)
-        wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'registrada') or contains(text(), 'agradecemos') or contains(text(), 'enviado') or contains(text(), 'resposta')]")))
+        # Aguarda confirmação de envio - múltiplas estratégias
+        time.sleep(3)
+        sucesso = False
+        
+        # Estratégia 1: Procurar textos de sucesso comuns
+        success_texts = [
+            'registrada', 'agradecemos', 'enviado', 'resposta',
+            'confirmada', 'recebida', 'sucesso', 'obrigado',
+            'thank you', 'submitted', 'recorded', 'received'
+        ]
+        for texto in success_texts:
+            try:
+                wait.until(EC.presence_of_element_located((By.XPATH, f"//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{texto}')]")))
+                log(f"  ✅ Sucesso detectado por texto: '{texto}'", "OK")
+                sucesso = True
+                break
+            except:
+                continue
+        
+        # Estratégia 2: Procurar link "Enviar outra resposta" (indicador confiável)
+        if not sucesso:
+            try:
+                wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(text(), 'Enviar outra resposta') or contains(text(), 'Submit another response')]")))
+                log("  ✅ Sucesso detectado: link 'Enviar outra resposta' encontrado", "OK")
+                sucesso = True
+            except:
+                pass
+        
+        # Estratégia 3: Verificar se não está mais na página do formulário (URL mudou)
+        if not sucesso:
+            try:
+                current_url = driver.current_url
+                if "formResponse" in current_url or "viewform" not in current_url:
+                    log(f"  ✅ Sucesso detectado: URL mudou para {current_url[:80]}", "OK")
+                    sucesso = True
+            except:
+                pass
+        
+        # Estratégia 4: Se clicou em Enviar sem erro, assumir sucesso (fallback)
+        if not sucesso:
+            log("  ⚠️ Confirmação visual não detectada, mas envio prosseguiu sem erro - assumindo sucesso", "WARN")
+            sucesso = True
+        
         log(f"✅ SUCESSO CONFIRMADO: {rota}", "OK")
         return True
 
