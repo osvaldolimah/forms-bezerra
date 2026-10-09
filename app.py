@@ -67,22 +67,35 @@ MAX_TENTATIVAS = 1
 INTERVALO_RETRY = 1
 
 BAIRROS_DEFAULT = [
-    "Cambeba", "Guararapes", "Benfica", "Itaperi", "Rodolfo Teófilo", "Cajazeiras",
-    "Aerolândia", "Alto da Balança", "Boa Vista", "Luciano Cavalcante",
-    "Dias Macedo", "Damas", "Montese", "Jardim América", "Parreão",
-    "Fátima", "Serrinha", "Cidade dos Funcionários",
-    "Parque Iracema", "Parque Manibura", "Parquelândia", "Amadeu Furtado",
-    "Rodolfo Teofilo", "São Gerardo", "Bom Futuro", "Vila União"
+    "Aerolândia", "Aeroporto", "Aldeota", "Alto da Balança", "Álvaro Weyne",
+    "Amadeu Furtado", "Ancuri", "Antônio Bezerra", "Autran Nunes", "Barra do Ceará",
+    "Barroso", "Bela Vista", "Benfica", "Boa Vista", "Bom Futuro",
+    "Bom Jardim", "Bonsucesso", "Cais do Porto", "Cajazeiras", "Cambeba",
+    "Canindezinho", "Carlito Pamplona", "Castelão", "Centro", "Cidade 2000",
+    "Cidade dos Funcionários", "Coaçu", "Conjunto Ceará I", "Conjunto Ceará II", "Conjunto Esperança",
+    "Conjunto Palmeiras", "Couto Fernandes", "Cristo Redentor", "Curió", "Damas",
+    "De Lourdes", "Demócrito Rocha", "Dendê", "Dias Macedo", "Dionísio Torres",
+    "Dom Lustosa", "Edson Queiroz", "Engenheiro Luciano Cavalcante", "Farias Brito", "Fátima",
+    "Floresta", "Genibaú", "Granja Lisboa", "Granja Portugal", "Guajerú",
+    "Guararapes", "Henrique Jorge", "Itaoca", "Itaperi", "Jacarecanga",
+    "Jangurussu", "Jardim America", "Jardim Cearense", "Jardim das Oliveiras", "Jardim Guanabara",
+    "João XXIII", "Joaquim Távora", "Jóquei Clube", "José de Alencar", "Lagoa Redonda",
+    "Manuel Dias Branco", "Manoel Sátiro", "Maraponga", "Meireles", "Messejana",
+    "Mondubim", "Montese", "Moura Brasil", "Mucuripe", "Novo Mondubim",
+    "Olavo Oliveira", "Padre Andrade", "Panamericano", "Papicu", "Parque Araxá",
+    "Parque Dois Irmãos", "Parque 2 irmãos", "Parque Manibura", "Parque Santa Rosa", "Parque São José",
+    "Parquelândia", "Parreão", "Passaré", "Paupina", "Pedras",
+    "Pici", "Pirambu", "Planalto Ayrton Senna", "Praia de Iracema", "Praia do Futuro I",
+    "Praia do Futuro II", "Prefeito José Walter", "Quintino Cunha", "Rodolfo Teófilo", "Sabiaguaba",
+    "Salinas", "Santa Maria", "São Bento", "São Gerardo", "São João do Tauape",
+    "Serrinha", "Siqueira", "Varjota", "Vicente Pinzón", "Vila Ellery",
+    "Vila União", "Vila Velha", "Parque Iracema", "Cocó"
 ]
 
 BAIRROS_PREFERIDOS_DEFAULT = [
-    "Parque Iracema",
-    "Cajazeiras",
-    "Cambeba",
-    "Damas",
-    "Itaperi",
-    "Guararapes",
-    "Luciano Cavalcante"
+    "Serrinha", "Pici", "Bela Vista", "Jardim America",
+    "Itaperi", "Fátima", "Vila União", "Bom Futuro", "Dias Macedo", "Parreão",
+    "Parque Dois Irmãos", "Parque 2 irmãos", "Benfica", "Damas", "Panamericano"
 ]
 
 # ==================== SESSION STATE ====================
