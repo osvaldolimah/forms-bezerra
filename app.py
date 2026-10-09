@@ -718,8 +718,8 @@ with st.sidebar:
     verificar_validade()
 
     st.subheader("👤 Dados do Funcionário")
-    nome_input = "Thiago Bezerra"
-    id_input = "2359946"
+    nome_input = "Osvaldo Holanda"
+    id_input = "2445201"
     st.text(f"Nome: {nome_input}")
     st.text(f"ID: {id_input}")
 
