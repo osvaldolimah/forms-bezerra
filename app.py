@@ -26,11 +26,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
 # ==================== DATA DE VENCIMENTO ====================
 # Altere esta data para definir um novo vencimento.
 # Formato: date(Ano, Mês, Dia)
-DATA_VENCIMENTO = date(2026, 10, 8)
+DATA_VENCIMENTO = date(2027, 10, 8)
 
 def verificar_validade():
     """Verifica se a data de hoje ultrapassou a data de vencimento."""
@@ -68,35 +67,22 @@ MAX_TENTATIVAS = 2
 INTERVALO_RETRY = 2
 
 BAIRROS_DEFAULT = [
-    "Aerolândia", "Aeroporto", "Aldeota", "Alto da Balança", "Álvaro Weyne",
-    "Amadeu Furtado", "Ancuri", "Antônio Bezerra", "Autran Nunes", "Barra do Ceará",
-    "Barroso", "Bela Vista", "Benfica", "Boa Vista", "Bom Futuro",
-    "Bom Jardim", "Bonsucesso", "Cais do Porto", "Cajazeiras", "Cambeba",
-    "Canindezinho", "Carlito Pamplona", "Castelão", "Centro", "Cidade 2000",
-    "Cidade dos Funcionários", "Coaçu", "Conjunto Ceará I", "Conjunto Ceará II", "Conjunto Esperança",
-    "Conjunto Palmeiras", "Couto Fernandes", "Cristo Redentor", "Curió", "Damas",
-    "De Lourdes", "Demócrito Rocha", "Dendê", "Dias Macedo", "Dionísio Torres",
-    "Dom Lustosa", "Edson Queiroz", "Engenheiro Luciano Cavalcante", "Farias Brito", "Fatima",
-    "Floresta", "Genibaú", "Granja Lisboa", "Granja Portugal", "Guajerú",
-    "Guararapes", "Henrique Jorge", "Itaoca", "Itaperi", "Jacarecanga",
-    "Jangurussu", "Jardim America", "Jardim Cearense", "Jardim das Oliveiras", "Jardim Guanabara",
-    "João XXIII", "Joaquim Távora", "Jóquei Clube", "José de Alencar", "Lagoa Redonda",
-    "Manuel Dias Branco", "Manoel Sátiro", "Maraponga", "Meireles", "Messejana",
-    "Mondubim", "Montese", "Moura Brasil", "Mucuripe", "Novo Mondubim",
-    "Olavo Oliveira", "Padre Andrade", "Panamericano", "Papicu", "Parque Araxá",
-    "Parque Dois Irmãos", "Parque 2 irmãos", "Parque Manibura", "Parque Santa Rosa", "Parque São José",
-    "Parquelândia", "Parreão", "Passaré", "Paupina", "Pedras",
-    "Pici", "Pirambu", "Planalto Ayrton Senna", "Praia de Iracema", "Praia do Futuro I",
-    "Praia do Futuro II", "Prefeito José Walter", "Quintino Cunha", "Rodolfo Teófilo", "Sabiaguaba",
-    "Salinas", "Santa Maria", "São Bento", "São Gerardo", "São João do Tauape",
-    "Serrinha", "Siqueira", "Varjota", "Vicente Pinzón", "Vila Ellery",
-    "Vila União", "Vila Velha", "Parque Iracema", "Cocó"
+    "Cambeba", "Guararapes", "Benfica", "Itaperi", "Rodolfo Teófilo", "Cajazeiras",
+    "Aerolândia", "Alto da Balança", "Boa Vista", "Luciano Cavalcante",
+    "Dias Macedo", "Damas", "Montese", "Jardim América", "Parreão",
+    "Fátima", "Serrinha", "Cidade dos Funcionários",
+    "Parque Iracema", "Parque Manibura", "Parquelândia", "Amadeu Furtado",
+    "Rodolfo Teofilo", "São Gerardo", "Bom Futuro", "Vila União"
 ]
 
 BAIRROS_PREFERIDOS_DEFAULT = [
-    "Serrinha", "Pici", "Bela Vista", "Jardim America",
-    "Itaperi", "Fatima", "Vila União", "Bom Futuro", "Dias Macedo", "Parreão",
-    "Parque Dois Irmãos", "Parque 2 irmãos", "Benfica", "Damas", "Panamericano"
+    "Parque Iracema",
+    "Cajazeiras",
+    "Cambeba",
+    "Damas",
+    "Itaperi",
+    "Guararapes",
+    "Luciano Cavalcante"
 ]
 
 # ==================== SESSION STATE ====================
@@ -537,73 +523,6 @@ def obter_rotas_disponiveis(
         driver.get(url)
         log("✅ Página carregada", "MAP")
         
-        time.sleep(1)
-        log("Aguardando inputs de identificação...", "MAP")
-        
-        try:
-            preencher_input_por_pergunta(driver, wait, "Qual seu nome?", nome)
-            log(f"✅ Nome preenchido: {nome}", "MAP")
-        except Exception as e:
-            log(f"⚠️ Erro ao preencher nome: {str(e)[:80]}", "AVISO")
-            raise
-        
-        try:
-            preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func)
-            log(f"✅ ID preenchido: {id_func}", "MAP")
-        except Exception as e:
-            log(f"⚠️ Erro ao preencher ID: {str(e)[:80]}", "AVISO")
-            raise
-        
-        time.sleep(1)
-        log("Procurando botão 'Avançar'...", "MAP")
-        
-        # Múltiplos XPaths para localizar o botão (PT e EN)
-        xpath_variants = [
-            "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']",
-            "//button//span[contains(text(), 'Avançar') or contains(text(), 'Próxima') or contains(text(), 'Next')]",
-            "//span[contains(text(), 'Avançar') or contains(text(), 'Próxima') or contains(text(), 'Next')]",
-            "//*[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']"
-        ]
-        
-        btn = None
-        for idx, xpath in enumerate(xpath_variants):
-            try:
-                log(f"  Tentando XPath {idx+1}/{len(xpath_variants)}...", "DEBUG")
-                elements = driver.find_elements(By.XPATH, xpath)
-                if elements:
-                    log(f"  ✅ Encontrou {len(elements)} elemento(s) com XPath {idx+1}", "DEBUG")
-                    btn = elements[0]
-                    break
-                else:
-                    log(f"  ❌ XPath {idx+1} retornou 0 elementos", "DEBUG")
-            except Exception as ex:
-                log(f"  ⚠️ XPath {idx+1} error: {str(ex)[:60]}", "DEBUG")
-                continue
-        
-        if not btn:
-            # Debugging: listar todos os spans na página
-            all_spans = driver.find_elements(By.TAG_NAME, "span")
-            log(f"⚠️ Botão não encontrado. Existem {len(all_spans)} spans na página.", "DEBUG")
-            for i, span in enumerate(all_spans[:10]):
-                try:
-                    text = span.text.strip()
-                    if text:
-                        log(f"  Span {i}: '{text[:40]}'", "DEBUG")
-                except:
-                    pass
-            raise Exception("Botão 'Avançar/Next' não localizado em nenhum XPath")
-        
-        try:
-            log("✅ Botão 'Avançar/Next' localizado", "MAP")
-            # Scroll até o botão
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
-            time.sleep(0.5)
-            safe_click(driver, btn)
-            log("✅ Avançou para página 2 (seleção de rota)", "MAP")
-        except Exception as e:
-            log(f"⚠️ Erro ao clicar no botão: {str(e)[:80]}", "AVISO")
-            raise
-
         time.sleep(2)
         log("Aguardando dropdown de rotas...", "MAP")
         
@@ -638,6 +557,10 @@ def obter_rotas_disponiveis(
                 log(f"⚠️ Erro ao processar opção {idx}: {str(e)[:60]}", "AVISO")
                 continue
 
+        # Fechar dropdown
+        driver.find_element(By.TAG_NAME, "body").click()
+        time.sleep(0.5)
+
         log(f"Mapeamento concluído — {len(rotas_encontradas)} rota(s) compatível(is)", "INFO")
         return rotas_encontradas
 
@@ -655,7 +578,7 @@ def obter_rotas_disponiveis(
 
 
 def enviar_formulario(
-    url: str, rota: str, nome: str, id_func: str, telefone: str,
+    url: str, rota: str, nome: str, id_func: str,
     log, tentativa: int = 1
 ) -> bool:
     driver = None
@@ -670,28 +593,21 @@ def enviar_formulario(
 
         log("  Navegando para formulário...", "DEBUG")
         driver.get(url)
-        time.sleep(1)
+        time.sleep(2)
         log("  ✅ Página carregada", "DEBUG")
 
-        # Página 1: Identificação
-        log("  Preenchendo página 1 (identificação)...", "DEBUG")
-        preencher_input_por_pergunta(driver, wait, "Qual seu nome?", nome)
+        # Preencher NOME COMPLETO
+        log("  Preenchendo NOME COMPLETO...", "DEBUG")
+        preencher_input_por_pergunta(driver, wait, "NOME COMPLETO", nome)
         log(f"    ✅ Nome: {nome}", "DEBUG")
         
-        preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func)
+        # Preencher ID
+        log("  Preenchendo ID...", "DEBUG")
+        preencher_input_por_pergunta(driver, wait, "ID", id_func)
         log(f"    ✅ ID: {id_func}", "DEBUG")
         
-        log("  Clicando botão Avançar (página 1)...", "DEBUG")
-        btn = wait.until(EC.element_to_be_clickable(
-            (By.XPATH, "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']")
-        ))
-        safe_click(driver, btn)
-        log("  ✅ Avançado para página 2", "DEBUG")
-
-        # Página 2: Seleção da Rota
-        time.sleep(2)
-        log("  Selecionando rota na página 2...", "DEBUG")
-        
+        # Selecionar rota no dropdown
+        log("  Selecionando rota...", "DEBUG")
         dropdown = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[@role='listbox']")))
         log("    ✅ Dropdown encontrado", "DEBUG")
         
@@ -705,23 +621,18 @@ def enviar_formulario(
         log(f"    ✅ Opção '{rota}' localizada", "DEBUG")
         
         safe_click(driver, opcao)
-        time.sleep(1)
+        time.sleep(0.5)
         log(f"    ✅ Opção '{rota}' selecionada", "DEBUG")
         
-        log("  Clicando botão Avançar (página 2)...", "DEBUG")
-        btn2 = wait.until(EC.element_to_be_clickable(
-            (By.XPATH, "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']")
-        ))
-        safe_click(driver, btn2)
-        log("  ✅ Avançado para página 3", "DEBUG")
-
-        # Página 3: Telefone + Envio
-        time.sleep(2)
-        log("  Preenchendo página 3 (telefone)...", "DEBUG")
+        # Selecionar "15 MINUTOS" (radio button com role=checkbox)
+        log("  Selecionando tempo: 15 MINUTOS...", "DEBUG")
+        radio_xpath = '//div[@role="checkbox" and @aria-label="15 MINUTOS"]'
+        radio = wait.until(EC.element_to_be_clickable((By.XPATH, radio_xpath)))
+        safe_click(driver, radio)
+        time.sleep(0.5)
+        log("    ✅ Tempo selecionado: 15 MINUTOS", "DEBUG")
         
-        preencher_input(driver, wait, 0, telefone)
-        log(f"    ✅ Telefone: {telefone}", "DEBUG")
-        
+        # Clicar em Enviar
         log("  Clicando botão Enviar...", "DEBUG")
         btn_enviar = wait.until(EC.element_to_be_clickable(
             (By.XPATH, "//span[normalize-space(text())='Enviar' or normalize-space(text())='Submit']")
@@ -729,9 +640,10 @@ def enviar_formulario(
         safe_click(driver, btn_enviar)
         log("  ✅ Formulário enviado (clique realizado)", "DEBUG")
         
-        # Aguarda um pouco para garantir que o envio foi processado
+        # Aguarda confirmação de envio
         time.sleep(2)
-        log(f"✅ SUCESSO: {rota}", "OK")
+        wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'registrada') or contains(text(), 'agradecemos') or contains(text(), 'enviado') or contains(text(), 'resposta')]")))
+        log(f"✅ SUCESSO CONFIRMADO: {rota}", "OK")
         return True
 
     except Exception as e:
@@ -747,7 +659,7 @@ def enviar_formulario(
                 except:
                     pass
                 driver = None
-            return enviar_formulario(url, rota, nome, id_func, telefone, log, tentativa + 1)
+            return enviar_formulario(url, rota, nome, id_func, log, tentativa + 1)
         return False
     finally:
         if driver:
@@ -779,8 +691,6 @@ with st.sidebar:
     id_input = "2359946"
     st.text(f"Nome: {nome_input}")
     st.text(f"ID: {id_input}")
-    telefone_input = st.text_input("Telefone", value="85988299118",
-                                   placeholder="Ex: 85999999999")
 
     st.divider()
     st.subheader("⚙️ Configurações Avançadas")
@@ -855,7 +765,6 @@ with tab_escala:
         erros = []
         if not nome_input.strip():    erros.append("Nome do funcionário")
         if not id_input.strip():      erros.append("ID do funcionário")
-        if not telefone_input.strip(): erros.append("Telefone")
         if not url_input.strip():     erros.append("URL do formulário")
         elif not validar_url(url_input.strip()):
             erros.append("URL inválida (deve ser docs.google.com/forms ou forms.gle)")
@@ -914,7 +823,7 @@ with tab_escala:
         )
 
         if btn_enviar:
-            if not nome_input.strip() or not id_input.strip() or not telefone_input.strip():
+            if not nome_input.strip() or not id_input.strip():
                 st.error("Credenciais incompletas na barra lateral.")
             else:
                 st.session_state.logs = []
@@ -937,7 +846,7 @@ with tab_escala:
 
                     ok = enviar_formulario(
                         url_input.strip(), rota,
-                        nome_input.strip(), id_input.strip(), telefone_input.strip(),
+                        nome_input.strip(), id_input.strip(),
                         log
                     )
                     st.session_state.resultado[rota] = ok

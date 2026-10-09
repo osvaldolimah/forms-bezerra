@@ -2,7 +2,7 @@ import logging
 import os
 import time
 import unicodedata
-from typing import List, Optional
+from typing import List
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -24,7 +24,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Silenciar logging verbose do webdriver_manager
 logging.getLogger('webdriver_manager').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
@@ -33,11 +32,9 @@ load_dotenv()
 
 NOME = os.getenv("NOME_FUNCIONARIO", "").strip()
 ID_FUNC = os.getenv("ID_FUNCIONARIO", "").strip()
-TELEFONE = os.getenv("TELEFONE", "").strip()
 
-# Validação de dados carregados
-if not all([NOME, ID_FUNC, TELEFONE]):
-    logger.error("[ERRO] Variaveis de ambiente nao configuradas. Crie um arquivo .env com NOME_FUNCIONARIO, ID_FUNCIONARIO e TELEFONE")
+if not all([NOME, ID_FUNC]):
+    logger.error("[ERRO] Variaveis de ambiente nao configuradas. Crie um arquivo .env com NOME_FUNCIONARIO e ID_FUNCIONARIO")
     exit(1)
 
 # ==================== DADOS ====================
@@ -50,10 +47,6 @@ MEUS_BAIRROS = [
     "Rodolfo Teofilo", "São Gerardo", "Bom Futuro", "Vila União"
 ]
 
-# ==================== BAIRROS PREFERIDOS ====================
-# Define a ordem de prioridade para envio dos formularios
-# Se um bairro preferido nao estiver disponivel, eh ignorado
-# Os bairros nao listados aqui serao processados por ultimo
 BAIRROS_PREFERIDOS = [
     "Parque Iracema",
     "Cajazeiras",
@@ -64,7 +57,6 @@ BAIRROS_PREFERIDOS = [
     "Luciano Cavalcante"
 ]
 
-# Configurações
 TIMEOUT_PADRAO = 15
 TIMEOUT_ENVIO = 20
 INTERVALO_ENTRE_ENVIOS = 3
@@ -74,26 +66,13 @@ INTERVALO_RETRY = 2
 # ==================== FUNÇÕES AUXILIARES ====================
 
 def ordenar_rotas_por_preferencia(rotas: List[str]) -> List[str]:
-    """
-    Reordena as rotas encontradas de acordo com a preferencia definida em BAIRROS_PREFERIDOS.
-    Bairros nao listados em BAIRROS_PREFERIDOS sao colocados no final.
-    
-    Args:
-        rotas: Lista de rotas encontradas
-        
-    Returns:
-        Lista de rotas reordenada por preferencia
-    """
     rotas_preferidas = []
     rotas_restantes = []
     
-    # Normalizar os bairros preferidos para comparacao
     bairros_pref_normalizados = {remover_acentos(b): b for b in BAIRROS_PREFERIDOS}
     
-    # Separar rotas: preferidas vs restantes
     for rota in rotas:
         rota_normalizada = remover_acentos(rota)
-        # Verificar se algum bairro preferido esta na rota
         encontrou_preferido = False
         for bairro_pref_norm, bairro_pref_original in bairros_pref_normalizados.items():
             if bairro_pref_norm in rota_normalizada:
@@ -104,7 +83,6 @@ def ordenar_rotas_por_preferencia(rotas: List[str]) -> List[str]:
         if not encontrou_preferido:
             rotas_restantes.append(rota)
     
-    # Ordenar rotas preferidas pela ordem em BAIRROS_PREFERIDOS
     rotas_preferidas.sort(key=lambda x: x[0])
     resultado = [rota for _, rota in rotas_preferidas] + rotas_restantes
     
@@ -112,15 +90,6 @@ def ordenar_rotas_por_preferencia(rotas: List[str]) -> List[str]:
 
 
 def remover_acentos(texto: str) -> str:
-    """
-    Normaliza o texto removendo acentos e convertendo para minúsculas.
-    
-    Args:
-        texto: String a normalizar
-        
-    Returns:
-        String normalizada sem acentos e em minúsculas
-    """
     if not texto:
         return ""
     nfkd_form = unicodedata.normalize('NFKD', texto)
@@ -128,22 +97,12 @@ def remover_acentos(texto: str) -> str:
 
 
 def validar_url(url: str) -> bool:
-    """
-    Valida se a URL é um formulário Google válido.
-    
-    Args:
-        url: URL a validar
-        
-    Returns:
-        True se é URL válida, False caso contrário
-    """
     try:
         result = urlparse(url)
         if not result.scheme or not result.netloc:
             logger.error(f"URL inválida: {url}")
             return False
         
-        # Aceita URLs completas (docs.google.com/forms) e encurtadas (forms.gle)
         if "docs.google.com/forms" not in url and "forms.gle" not in url:
             logger.warning(f"URL nao parece ser um formulario Google: {url}")
             return False
@@ -155,13 +114,6 @@ def validar_url(url: str) -> bool:
 
 
 def safe_click(driver: webdriver.Chrome, element) -> None:
-    """
-    Garante o clique via JavaScript para evitar intercepções.
-    
-    Args:
-        driver: WebDriver do Selenium
-        element: Elemento a clicar
-    """
     try:
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
         time.sleep(0.3)
@@ -175,76 +127,42 @@ def safe_click(driver: webdriver.Chrome, element) -> None:
             raise
 
 
-def preencher_input(driver: webdriver.Chrome, wait: WebDriverWait, index: int, texto: str) -> None:
+def preencher_input_por_pergunta(driver: webdriver.Chrome, wait: WebDriverWait, pergunta: str, valor: str) -> None:
     """
-    Localiza o input pelo índice e realiza o preenchimento seguro.
+    Preenche um campo de texto baseado no texto da pergunta.
+    Procura o container da pergunta (role=listitem) e depois o input dentro dele.
+    """
+    xpath_container = f'//div[@role="listitem" and contains(., "{pergunta}")]'
     
-    Args:
-        driver: WebDriver do Selenium
-        wait: WebDriverWait para esperas explícitas
-        index: Índice do input
-        texto: Texto a inserir
-    """
-    xpath_inputs = "//input[@type='text' or @type='number']"
-
-    wait.until(
-        lambda d: len([el for el in d.find_elements(By.XPATH, xpath_inputs) if el.is_displayed()]) > index
-    )
-    inputs = [el for el in driver.find_elements(By.XPATH, xpath_inputs) if el.is_displayed()]
-
-    if len(inputs) <= index:
-        raise IndexError(
-            f"Não foi possível localizar o input de índice {index}. "
-            f"Encontrados {len(inputs)} inputs visíveis."
-        )
-
-    campo = inputs[index]
-    safe_click(driver, campo)
-    campo.clear()
-    campo.send_keys(texto)
-
-
-def obter_elemento_botao(driver: webdriver.Chrome, wait: WebDriverWait, texto_botao: str):
-    """
-    Localiza botão por texto - padrão do main.py original.
+    container = wait.until(EC.presence_of_element_located((By.XPATH, xpath_container)))
     
-    Args:
-        driver: WebDriver do Selenium
-        wait: WebDriverWait para esperas explícitas
-        texto_botao: Texto do botão a procurar
-        
-    Returns:
-        Elemento do botão ou None se não encontrado
-    """
-    try:
-        xpath = f"//span[normalize-space(text())='{texto_botao}' or normalize-space(text())='Próxima']" if texto_botao == "Avançar" else f"//span[normalize-space(text())='{texto_botao}']"
-        elemento = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)), timeout=5)
-        logger.debug(f"Botao '{texto_botao}' encontrado")
-        return elemento
-    except Exception as e:
-        logger.debug(f"Botao '{texto_botao}' nao encontrado: {e}")
-        return None
+    input_el = container.find_element(By.XPATH, './/input[@type="text"]')
+    
+    safe_click(driver, input_el)
+    input_el.clear()
+    driver.execute_script("arguments[0].value = arguments[1];", input_el, valor)
+    driver.execute_script("""
+        var el = arguments[0];
+        ['input', 'change', 'blur'].forEach(function(evtName) {
+            el.dispatchEvent(new Event(evtName, { bubbles: true }));
+        });
+    """, input_el)
+    logger.debug(f"Preenchido '{pergunta}': {valor}")
 
 
 def criar_driver() -> webdriver.Chrome:
-    """
-    Cria uma nova instância do Chrome WebDriver.
-    
-    Returns:
-        WebDriver configurado
-    """
     try:
         options = webdriver.ChromeOptions()
-        # Descomente a linha abaixo para modo headless (sem interface visual)
-        # options.add_argument("--headless")
+        options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        # Suprimir erros internos do Chrome (GCM, logging, etc)
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-plugins")
         options.add_argument("--disable-sync")
         options.add_argument("--disable-default-apps")
-        options.add_argument("--log-level=3")  # Apenas erros críticos
+        options.add_argument("--log-level=3")
         options.add_argument("--disable-logging")
         
         driver = webdriver.Chrome(
@@ -259,15 +177,6 @@ def criar_driver() -> webdriver.Chrome:
 
 
 def obter_rotas_disponiveis(url: str) -> List[str]:
-    """
-    Mapeia as rotas no formulário que coincidem com a lista de bairros.
-    
-    Args:
-        url: URL do formulário Google
-        
-    Returns:
-        Lista de rotas encontradas
-    """
     driver = None
     try:
         if not validar_url(url):
@@ -281,20 +190,12 @@ def obter_rotas_disponiveis(url: str) -> List[str]:
         
         logger.info("[INFO] Iniciando mapeamento de rotas disponiveis...")
         driver.get(url)
-        
-        # Página 1: Identificação
-        preencher_input(driver, wait, 0, NOME)
-        preencher_input(driver, wait, 1, ID_FUNC)
-        
-        btn_avancar = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima']")))
-        safe_click(driver, btn_avancar)
-
-        # Página 2: Mapeamento do Dropdown
         time.sleep(2)
+        
         dropdown = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[@role='listbox']")))
         safe_click(driver, dropdown)
+        time.sleep(1)
         
-        time.sleep(2)
         opcoes = driver.find_elements(By.XPATH, "//div[@role='option']")
         
         for opt in opcoes:
@@ -304,6 +205,9 @@ def obter_rotas_disponiveis(url: str) -> List[str]:
                 if any(b_limpo in texto_limpo for b_limpo in meus_bairros_limpos):
                     rotas_encontradas.append(texto_original)
                     logger.info(f"[OK] Rota identificada: {texto_original}")
+        
+        driver.find_element(By.TAG_NAME, "body").click()
+        time.sleep(0.5)
         
         logger.info(f"[RESUMO] Total de rotas compativeis: {len(rotas_encontradas)}")
         return rotas_encontradas
@@ -319,17 +223,6 @@ def obter_rotas_disponiveis(url: str) -> List[str]:
 
 
 def enviar_formulario(url: str, rota: str, tentativa: int = 1) -> bool:
-    """
-    Preenche e envia o formulario para uma rota especifica, aguardando confirmacao.
-    
-    Args:
-        url: URL do formulario Google
-        rota: Nome da rota a selecionar
-        tentativa: Numero da tentativa atual
-        
-    Returns:
-        True se sucesso, False se falha
-    """
     driver = None
     try:
         driver = criar_driver()
@@ -337,16 +230,15 @@ def enviar_formulario(url: str, rota: str, tentativa: int = 1) -> bool:
         
         logger.info(f"[PROCESSANDO] Tentativa {tentativa}/{MAX_TENTATIVAS} - Rota: {rota}")
         driver.get(url)
-        
-        # Pagina 1: Identificacao
-        preencher_input(driver, wait, 0, NOME)
-        preencher_input(driver, wait, 1, ID_FUNC)
-        
-        btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima']")))
-        safe_click(driver, btn)
-
-        # Pagina 2: Selecao da Rota
         time.sleep(2)
+        
+        # 1. Preencher NOME COMPLETO
+        preencher_input_por_pergunta(driver, wait, "NOME COMPLETO", NOME)
+        
+        # 2. Preencher ID
+        preencher_input_por_pergunta(driver, wait, "ID", ID_FUNC)
+        
+        # 3. Selecionar rota no dropdown
         dropdown = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[@role='listbox']")))
         safe_click(driver, dropdown)
         time.sleep(1)
@@ -354,27 +246,28 @@ def enviar_formulario(url: str, rota: str, tentativa: int = 1) -> bool:
         opcao_xpath = f"//div[@role='option']//span[text()='{rota}']"
         opcao = wait.until(EC.element_to_be_clickable((By.XPATH, opcao_xpath)))
         safe_click(driver, opcao)
+        time.sleep(0.5)
+        logger.debug(f"Rota selecionada: {rota}")
         
-        time.sleep(1)
-        btn2 = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima']")))
-        safe_click(driver, btn2)
-
-        # Pagina 3: Telefone
-        time.sleep(2)
-        preencher_input(driver, wait, 0, TELEFONE)
+        # 4. Selecionar "15 MINUTOS" - radio button com role=checkbox e aria-label
+        radio_xpath = '//div[@role="checkbox" and @aria-label="15 MINUTOS"]'
+        radio = wait.until(EC.element_to_be_clickable((By.XPATH, radio_xpath)))
+        safe_click(driver, radio)
+        time.sleep(0.5)
+        logger.debug("Tempo selecionado: 15 MINUTOS")
         
+        # 5. Clicar em Enviar
         btn_enviar = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[normalize-space(text())='Enviar']")))
         safe_click(driver, btn_enviar)
-
-        # Verificacao de Sucesso (Aguarda o Google processar o envio)
-        wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'registrada') or contains(text(), 'agradecemos')]")))
+        
+        # Verificação de Sucesso
+        wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'registrada') or contains(text(), 'agradecemos') or contains(text(), 'enviado') or contains(text(), 'resposta')]")))
         logger.info(f"[OK] SUCESSO CONFIRMADO: {rota}")
         return True
         
     except Exception as e:
         logger.error(f"[ERRO] Falha no envio ({rota}): {e}")
         
-        # Retry para erros temporarios
         if tentativa < MAX_TENTATIVAS:
             logger.info(f"[RETRY] Aguardando {INTERVALO_RETRY}s antes de retry...")
             time.sleep(INTERVALO_RETRY)
@@ -392,7 +285,7 @@ def enviar_formulario(url: str, rota: str, tentativa: int = 1) -> bool:
 
 if __name__ == "__main__":
     logger.info("="*60)
-    logger.info("INICIANDO AUTOMACAO DE FORMULARIOS")
+    logger.info("INICIANDO AUTOMACAO DE FORMULARIOS - NOVO MODELO")
     logger.info("="*60)
     
     url_dia = input("Cole a URL do Forms: ").strip()
@@ -405,7 +298,6 @@ if __name__ == "__main__":
     
     lista_de_rotas = obter_rotas_disponiveis(url_dia)
     
-    # Reordenar rotas de acordo com preferencia
     if lista_de_rotas:
         lista_de_rotas = ordenar_rotas_por_preferencia(lista_de_rotas)
     
@@ -425,7 +317,6 @@ if __name__ == "__main__":
             else:
                 falha_count += 1
             
-            # Intervalo de segurança entre envios
             if idx < len(lista_de_rotas):
                 logger.info(f"[AGUARDANDO] {INTERVALO_ENTRE_ENVIOS}s ate proximo envio...")
                 time.sleep(INTERVALO_ENTRE_ENVIOS)
