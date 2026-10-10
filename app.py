@@ -358,6 +358,20 @@ def preencher_input_por_pergunta(driver, wait, pergunta: str, texto: str) -> Non
             except Exception:
                 continue
 
+    # DEBUG: Log all visible labels/spans to help diagnose
+    if container is None:
+        try:
+            all_labels = driver.find_elements(By.XPATH, "//span | //div | //label")
+            for el in all_labels[:30]:
+                try:
+                    txt = el.text.strip()
+                    if txt and len(txt) > 2:
+                        print(f"DEBUG_LABEL: {txt[:80]}")
+                except:
+                    pass
+        except:
+            pass
+
     if container is None:
         try:
             inputs = _elementos_editaveis_visiveis(driver)
