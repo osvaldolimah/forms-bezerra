@@ -26,6 +26,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 # ==================== DATA DE VENCIMENTO ====================
 # Altere esta data para definir um novo vencimento.
 # Formato: date(Ano, Mês, Dia)
@@ -60,11 +61,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==================== CONSTANTES ====================
-TIMEOUT_PADRAO = 8
-TIMEOUT_ENVIO = 10
-INTERVALO_ENTRE_ENVIOS = 1
-MAX_TENTATIVAS = 1
-INTERVALO_RETRY = 1
+TIMEOUT_PADRAO = 15
+TIMEOUT_ENVIO = 20
+INTERVALO_ENTRE_ENVIOS = 3
+MAX_TENTATIVAS = 2
+INTERVALO_RETRY = 2
 
 BAIRROS_DEFAULT = [
     "Aerolândia", "Aeroporto", "Aldeota", "Alto da Balança", "Álvaro Weyne",
@@ -75,7 +76,7 @@ BAIRROS_DEFAULT = [
     "Cidade dos Funcionários", "Coaçu", "Conjunto Ceará I", "Conjunto Ceará II", "Conjunto Esperança",
     "Conjunto Palmeiras", "Couto Fernandes", "Cristo Redentor", "Curió", "Damas",
     "De Lourdes", "Demócrito Rocha", "Dendê", "Dias Macedo", "Dionísio Torres",
-    "Dom Lustosa", "Edson Queiroz", "Engenheiro Luciano Cavalcante", "Farias Brito", "Fátima",
+    "Dom Lustosa", "Edson Queiroz", "Engenheiro Luciano Cavalcante", "Farias Brito", "Fatima",
     "Floresta", "Genibaú", "Granja Lisboa", "Granja Portugal", "Guajerú",
     "Guararapes", "Henrique Jorge", "Itaoca", "Itaperi", "Jacarecanga",
     "Jangurussu", "Jardim America", "Jardim Cearense", "Jardim das Oliveiras", "Jardim Guanabara",
@@ -94,7 +95,7 @@ BAIRROS_DEFAULT = [
 
 BAIRROS_PREFERIDOS_DEFAULT = [
     "Serrinha", "Pici", "Bela Vista", "Jardim America",
-    "Itaperi", "Fátima", "Vila União", "Bom Futuro", "Dias Macedo", "Parreão",
+    "Itaperi", "Fatima", "Vila União", "Bom Futuro", "Dias Macedo", "Parreão",
     "Parque Dois Irmãos", "Parque 2 irmãos", "Benfica", "Damas", "Panamericano"
 ]
 
@@ -523,6 +524,8 @@ def obter_rotas_disponiveis(
     driver = None
     try:
         log("Iniciando ChromeDriver para mapeamento...", "MAP")
+        chrome_path, chromedriver_path = _detectar_binarios_chrome()
+        _log_diagnostico_ambiente(log, chrome_path, chromedriver_path)
         driver = criar_driver()
         log("✅ ChromeDriver iniciado", "MAP")
         
@@ -534,6 +537,74 @@ def obter_rotas_disponiveis(
         driver.get(url)
         log("✅ Página carregada", "MAP")
         
+        time.sleep(1)
+        log("Aguardando inputs de identificação...", "MAP")
+        
+        try:
+            preencher_input_por_pergunta(driver, wait, "Qual seu nome?", nome)
+            log(f"✅ Nome preenchido: {nome}", "MAP")
+        except Exception as e:
+            log(f"⚠️ Erro ao preencher nome: {str(e)[:80]}", "AVISO")
+            raise
+        
+        try:
+            preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func)
+            log(f"✅ ID preenchido: {id_func}", "MAP")
+        except Exception as e:
+            log(f"⚠️ Erro ao preencher ID: {str(e)[:80]}", "AVISO")
+            raise
+        
+        time.sleep(1)
+        log("Procurando botão 'Avançar'...", "MAP")
+        
+        # Múltiplos XPaths para localizar o botão (PT e EN)
+        xpath_variants = [
+            "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']",
+            "//button//span[contains(text(), 'Avançar') or contains(text(), 'Próxima') or contains(text(), 'Next')]",
+            "//span[contains(text(), 'Avançar') or contains(text(), 'Próxima') or contains(text(), 'Next')]",
+            "//*[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']"
+        ]
+        
+        btn = None
+        for idx, xpath in enumerate(xpath_variants):
+            try:
+                log(f"  Tentando XPath {idx+1}/{len(xpath_variants)}...", "DEBUG")
+                elements = driver.find_elements(By.XPATH, xpath)
+                if elements:
+                    log(f"  ✅ Encontrou {len(elements)} elemento(s) com XPath {idx+1}", "DEBUG")
+                    btn = elements[0]
+                    break
+                else:
+                    log(f"  ❌ XPath {idx+1} retornou 0 elementos", "DEBUG")
+            except Exception as ex:
+                log(f"  ⚠️ XPath {idx+1} error: {str(ex)[:60]}", "DEBUG")
+                continue
+        
+        if not btn:
+            # Debugging: listar todos os spans na página
+            all_spans = driver.find_elements(By.TAG_NAME, "span")
+            log(f"⚠️ Botão não encontrado. Existem {len(all_spans)} spans na página.", "DEBUG")
+            for i, span in enumerate(all_spans[:10]):
+                try:
+                    text = span.text.strip()
+                    if text:
+                        log(f"  Span {i}: '{text[:40]}'", "DEBUG")
+                except:
+                    pass
+            raise Exception("Botão 'Avançar/Next' não localizado em nenhum XPath")
+        
+        try:
+            log("✅ Botão 'Avançar/Next' localizado", "MAP")
+            # Scroll até o botão
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+            time.sleep(0.5)
+            safe_click(driver, btn)
+            log("✅ Avançou para página 2 (seleção de rota)", "MAP")
+        except Exception as e:
+            log(f"⚠️ Erro ao clicar no botão: {str(e)[:80]}", "AVISO")
+            raise
+
+        time.sleep(2)
         log("Aguardando dropdown de rotas...", "MAP")
         
         try:
@@ -545,7 +616,7 @@ def obter_rotas_disponiveis(
             log(f"⚠️ Erro com dropdown: {str(e)[:80]}", "AVISO")
             raise
             
-        time.sleep(0.3)
+        time.sleep(2)
         log("Extraindo opções do dropdown...", "MAP")
         
         try:
@@ -567,10 +638,6 @@ def obter_rotas_disponiveis(
                 log(f"⚠️ Erro ao processar opção {idx}: {str(e)[:60]}", "AVISO")
                 continue
 
-        # Fechar dropdown
-        driver.find_element(By.TAG_NAME, "body").click()
-        time.sleep(0.1)
-
         log(f"Mapeamento concluído — {len(rotas_encontradas)} rota(s) compatível(is)", "INFO")
         return rotas_encontradas
 
@@ -588,12 +655,14 @@ def obter_rotas_disponiveis(
 
 
 def enviar_formulario(
-    url: str, rota: str, nome: str, id_func: str,
+    url: str, rota: str, nome: str, id_func: str, telefone: str,
     log, tentativa: int = 1
 ) -> bool:
     driver = None
     try:
         log(f"[Tentativa {tentativa}/{MAX_TENTATIVAS}] Iniciando envio: {rota}", "PROC")
+        chrome_path, chromedriver_path = _detectar_binarios_chrome()
+        _log_diagnostico_ambiente(log, chrome_path, chromedriver_path)
         driver = criar_driver()
         log("  ✅ ChromeDriver criado", "DEBUG")
         
@@ -601,26 +670,33 @@ def enviar_formulario(
 
         log("  Navegando para formulário...", "DEBUG")
         driver.get(url)
-        time.sleep(0.5)
+        time.sleep(1)
         log("  ✅ Página carregada", "DEBUG")
 
-        # Preencher NOME COMPLETO
-        log("  Preenchendo NOME COMPLETO...", "DEBUG")
-        preencher_input_por_pergunta(driver, wait, "NOME COMPLETO", nome)
+        # Página 1: Identificação
+        log("  Preenchendo página 1 (identificação)...", "DEBUG")
+        preencher_input_por_pergunta(driver, wait, "Qual seu nome?", nome)
         log(f"    ✅ Nome: {nome}", "DEBUG")
         
-        # Preencher ID
-        log("  Preenchendo ID...", "DEBUG")
-        preencher_input_por_pergunta(driver, wait, "ID", id_func)
+        preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func)
         log(f"    ✅ ID: {id_func}", "DEBUG")
         
-        # Selecionar rota no dropdown
-        log("  Selecionando rota...", "DEBUG")
+        log("  Clicando botão Avançar (página 1)...", "DEBUG")
+        btn = wait.until(EC.element_to_be_clickable(
+            (By.XPATH, "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']")
+        ))
+        safe_click(driver, btn)
+        log("  ✅ Avançado para página 2", "DEBUG")
+
+        # Página 2: Seleção da Rota
+        time.sleep(2)
+        log("  Selecionando rota na página 2...", "DEBUG")
+        
         dropdown = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[@role='listbox']")))
         log("    ✅ Dropdown encontrado", "DEBUG")
         
         safe_click(driver, dropdown)
-        time.sleep(0.2)
+        time.sleep(1)
         log("    ✅ Dropdown aberto", "DEBUG")
         
         opcao = wait.until(EC.element_to_be_clickable(
@@ -629,18 +705,23 @@ def enviar_formulario(
         log(f"    ✅ Opção '{rota}' localizada", "DEBUG")
         
         safe_click(driver, opcao)
-        time.sleep(0.1)
+        time.sleep(1)
         log(f"    ✅ Opção '{rota}' selecionada", "DEBUG")
         
-        # Selecionar "15 MINUTOS" (radio button com role=checkbox)
-        log("  Selecionando tempo: 15 MINUTOS...", "DEBUG")
-        radio_xpath = '//div[@role="checkbox" and @aria-label="15 MINUTOS"]'
-        radio = wait.until(EC.element_to_be_clickable((By.XPATH, radio_xpath)))
-        safe_click(driver, radio)
-        time.sleep(0.1)
-        log("    ✅ Tempo selecionado: 15 MINUTOS", "DEBUG")
+        log("  Clicando botão Avançar (página 2)...", "DEBUG")
+        btn2 = wait.until(EC.element_to_be_clickable(
+            (By.XPATH, "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']")
+        ))
+        safe_click(driver, btn2)
+        log("  ✅ Avançado para página 3", "DEBUG")
+
+        # Página 3: Telefone + Envio
+        time.sleep(2)
+        log("  Preenchendo página 3 (telefone)...", "DEBUG")
         
-        # Clicar em Enviar
+        preencher_input(driver, wait, 0, telefone)
+        log(f"    ✅ Telefone: {telefone}", "DEBUG")
+        
         log("  Clicando botão Enviar...", "DEBUG")
         btn_enviar = wait.until(EC.element_to_be_clickable(
             (By.XPATH, "//span[normalize-space(text())='Enviar' or normalize-space(text())='Submit']")
@@ -648,46 +729,9 @@ def enviar_formulario(
         safe_click(driver, btn_enviar)
         log("  ✅ Formulário enviado (clique realizado)", "DEBUG")
         
-        # Aguarda confirmação de envio - estratégia rápida
-        time.sleep(1)
-        sucesso = False
-        
-        # Estratégia 1: Verificar URL (mais rápido)
-        try:
-            current_url = driver.current_url
-            if "formResponse" in current_url or "viewform" not in current_url:
-                log(f"  ✅ Sucesso detectado: URL mudou", "OK")
-                sucesso = True
-        except:
-            pass
-        
-        # Estratégia 2: Link "Enviar outra resposta" (rápido)
-        if not sucesso:
-            try:
-                wait.until(EC.presence_of_element_located((By.XPATH, "//a[contains(text(), 'Enviar outra resposta') or contains(text(), 'Submit another response')]")))
-                log("  ✅ Sucesso detectado: link 'Enviar outra resposta'", "OK")
-                sucesso = True
-            except:
-                pass
-        
-        # Estratégia 3: Textos de sucesso (fallback)
-        if not sucesso:
-            success_texts = ['registrada', 'agradecemos', 'enviado', 'resposta', 'confirmada', 'recebida', 'sucesso', 'obrigado', 'thank you', 'submitted', 'recorded', 'received']
-            for texto in success_texts:
-                try:
-                    wait.until(EC.presence_of_element_located((By.XPATH, f"//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{texto}')]")))
-                    log(f"  ✅ Sucesso detectado: '{texto}'", "OK")
-                    sucesso = True
-                    break
-                except:
-                    continue
-        
-        # Fallback: assumir sucesso se clicou sem erro
-        if not sucesso:
-            log("  ⚠️ Assumindo sucesso (clique OK)", "WARN")
-            sucesso = True
-        
-        log(f"✅ SUCESSO CONFIRMADO: {rota}", "OK")
+        # Aguarda um pouco para garantir que o envio foi processado
+        time.sleep(2)
+        log(f"✅ SUCESSO: {rota}", "OK")
         return True
 
     except Exception as e:
@@ -703,7 +747,7 @@ def enviar_formulario(
                 except:
                     pass
                 driver = None
-            return enviar_formulario(url, rota, nome, id_func, log, tentativa + 1)
+            return enviar_formulario(url, rota, nome, id_func, telefone, log, tentativa + 1)
         return False
     finally:
         if driver:
@@ -735,6 +779,8 @@ with st.sidebar:
     id_input = "2359946"
     st.text(f"Nome: {nome_input}")
     st.text(f"ID: {id_input}")
+    telefone_input = st.text_input("Telefone", value="85988299118",
+                                   placeholder="Ex: 85999999999")
 
     st.divider()
     st.subheader("⚙️ Configurações Avançadas")
@@ -809,6 +855,7 @@ with tab_escala:
         erros = []
         if not nome_input.strip():    erros.append("Nome do funcionário")
         if not id_input.strip():      erros.append("ID do funcionário")
+        if not telefone_input.strip(): erros.append("Telefone")
         if not url_input.strip():     erros.append("URL do formulário")
         elif not validar_url(url_input.strip()):
             erros.append("URL inválida (deve ser docs.google.com/forms ou forms.gle)")
@@ -867,7 +914,7 @@ with tab_escala:
         )
 
         if btn_enviar:
-            if not nome_input.strip() or not id_input.strip():
+            if not nome_input.strip() or not id_input.strip() or not telefone_input.strip():
                 st.error("Credenciais incompletas na barra lateral.")
             else:
                 st.session_state.logs = []
@@ -890,7 +937,7 @@ with tab_escala:
 
                     ok = enviar_formulario(
                         url_input.strip(), rota,
-                        nome_input.strip(), id_input.strip(),
+                        nome_input.strip(), id_input.strip(), telefone_input.strip(),
                         log
                     )
                     st.session_state.resultado[rota] = ok
