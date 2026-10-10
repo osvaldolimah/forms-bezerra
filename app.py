@@ -61,8 +61,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==================== CONSTANTES ====================
-TIMEOUT_PADRAO = 15
-TIMEOUT_ENVIO = 20
+TIMEOUT_PADRAO = 30
+TIMEOUT_ENVIO = 40
 INTERVALO_ENTRE_ENVIOS = 3
 MAX_TENTATIVAS = 2
 INTERVALO_RETRY = 2
@@ -285,11 +285,49 @@ def preencher_input_por_html(driver, wait, indice: int, texto: str) -> None:
     _preencher_elemento(driver, elementos[indice], texto)
 
 
-def preencher_input_por_pergunta(driver, wait, pergunta: str, texto: str) -> None:
+def _encontrar_botao_avancar(driver, wait):
+    """Encontra o botão 'Avançar/Próxima/Next' com múltiplas estratégias."""
+    xpath_variants = [
+        "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']",
+        "//button//span[contains(text(), 'Avançar') or contains(text(), 'Próxima') or contains(text(), 'Next')]",
+        "//span[contains(text(), 'Avançar') or contains(text(), 'Próxima') or contains(text(), 'Next')]",
+        "//*[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']",
+        "//div[@role='button']//span[contains(text(), 'Avançar') or contains(text(), 'Próxima') or contains(text(), 'Next')]",
+    ]
+    for xpath in xpath_variants:
+        try:
+            elements = driver.find_elements(By.XPATH, xpath)
+            if elements:
+                return elements[0]
+        except Exception:
+            continue
+    return None
+
+
+def _encontrar_botao_enviar(driver, wait):
+    """Encontra o botão 'Enviar/Submit' com múltiplas estratégias."""
+    xpath_variants = [
+        "//span[normalize-space(text())='Enviar' or normalize-space(text())='Submit']",
+        "//button//span[contains(text(), 'Enviar') or contains(text(), 'Submit')]",
+        "//span[contains(text(), 'Enviar') or contains(text(), 'Submit')]",
+        "//*[normalize-space(text())='Enviar' or normalize-space(text())='Submit']",
+        "//div[@role='button']//span[contains(text(), 'Enviar') or contains(text(), 'Submit')]",
+    ]
+    for xpath in xpath_variants:
+        try:
+            elements = driver.find_elements(By.XPATH, xpath)
+            if elements:
+                return elements[0]
+        except Exception:
+            continue
+    return None
     """Localiza o input associado ao texto da pergunta e preenche o campo."""
+    pergunta_normalizada = pergunta.lower().strip()
+    palavras_chave = [p for p in pergunta_normalizada.split() if len(p) > 2]
+    
     bloco_xpath = (
         f"//div[@jsmodel='CP1oW'][.//*[self::span or self::div or self::label]"
-        f"[contains(normalize-space(.), {xpath_literal(pergunta)})]]"
+        f"[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÂÊÔÃÕÇ', 'abcdefghijklmnopqrstuvwxyzáéíóúâêôãõç'), {xpath_literal(pergunta_normalizada)})]]"
     )
 
     try:
@@ -298,18 +336,35 @@ def preencher_input_por_pergunta(driver, wait, pergunta: str, texto: str) -> Non
         container = None
 
     if container is None:
-        pergunta_xpath = (
-            f"//*[self::span or self::div or self::label][contains(normalize-space(.), {xpath_literal(pergunta)})]"
-        )
-        pergunta_element = wait.until(EC.presence_of_element_located((By.XPATH, pergunta_xpath)))
+        for kw in palavras_chave:
+            try:
+                pergunta_xpath = (
+                    f"//*[self::span or self::div or self::label]"
+                    f"[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÂÊÔÃÕÇ', 'abcdefghijklmnopqrstuvwxyzáéíóúâêôãõç'), {xpath_literal(kw)})]"
+                )
+                pergunta_element = wait.until(EC.presence_of_element_located((By.XPATH, pergunta_xpath)))
+                
+                try:
+                    container = pergunta_element.find_element(
+                        By.XPATH,
+                        "./ancestor::div[@jsmodel='CP1oW'][1]",
+                    )
+                except Exception:
+                    container = pergunta_element
+                break
+            except Exception:
+                continue
 
+    if container is None:
         try:
-            container = pergunta_element.find_element(
-                By.XPATH,
-                "./ancestor::div[@jsmodel='CP1oW'][1]",
-            )
+            inputs = _elementos_editaveis_visiveis(driver)
+            if inputs:
+                container = driver.find_element(By.TAG_NAME, "body")
         except Exception:
-            container = pergunta_element
+            pass
+
+    if container is None:
+        raise IndexError(f"Não foi possível localizar o container da pergunta: {pergunta}")
 
     inputs = _elementos_editaveis_visiveis(container)
 
@@ -537,7 +592,7 @@ def obter_rotas_disponiveis(
         driver.get(url)
         log("✅ Página carregada", "MAP")
         
-        time.sleep(1)
+        time.sleep(3)
         log("Aguardando inputs de identificação...", "MAP")
         
         try:
@@ -557,28 +612,7 @@ def obter_rotas_disponiveis(
         time.sleep(1)
         log("Procurando botão 'Avançar'...", "MAP")
         
-        # Múltiplos XPaths para localizar o botão (PT e EN)
-        xpath_variants = [
-            "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']",
-            "//button//span[contains(text(), 'Avançar') or contains(text(), 'Próxima') or contains(text(), 'Next')]",
-            "//span[contains(text(), 'Avançar') or contains(text(), 'Próxima') or contains(text(), 'Next')]",
-            "//*[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']"
-        ]
-        
-        btn = None
-        for idx, xpath in enumerate(xpath_variants):
-            try:
-                log(f"  Tentando XPath {idx+1}/{len(xpath_variants)}...", "DEBUG")
-                elements = driver.find_elements(By.XPATH, xpath)
-                if elements:
-                    log(f"  ✅ Encontrou {len(elements)} elemento(s) com XPath {idx+1}", "DEBUG")
-                    btn = elements[0]
-                    break
-                else:
-                    log(f"  ❌ XPath {idx+1} retornou 0 elementos", "DEBUG")
-            except Exception as ex:
-                log(f"  ⚠️ XPath {idx+1} error: {str(ex)[:60]}", "DEBUG")
-                continue
+        btn = _encontrar_botao_avancar(driver, wait)
         
         if not btn:
             # Debugging: listar todos os spans na página
@@ -670,7 +704,7 @@ def enviar_formulario(
 
         log("  Navegando para formulário...", "DEBUG")
         driver.get(url)
-        time.sleep(1)
+        time.sleep(3)
         log("  ✅ Página carregada", "DEBUG")
 
         # Página 1: Identificação
@@ -681,10 +715,12 @@ def enviar_formulario(
         preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func)
         log(f"    ✅ ID: {id_func}", "DEBUG")
         
+        time.sleep(1)
+        
         log("  Clicando botão Avançar (página 1)...", "DEBUG")
-        btn = wait.until(EC.element_to_be_clickable(
-            (By.XPATH, "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']")
-        ))
+        btn = _encontrar_botao_avancar(driver, wait)
+        if not btn:
+            raise Exception("Botão 'Avançar/Next' não encontrado na página 1")
         safe_click(driver, btn)
         log("  ✅ Avançado para página 2", "DEBUG")
 
@@ -700,7 +736,7 @@ def enviar_formulario(
         log("    ✅ Dropdown aberto", "DEBUG")
         
         opcao = wait.until(EC.element_to_be_clickable(
-            (By.XPATH, f"//div[@role='option']//span[text()='{rota}']")
+            (By.XPATH, f"//div[@role='option']//span[normalize-space(text())={xpath_literal(rota)}]")
         ))
         log(f"    ✅ Opção '{rota}' localizada", "DEBUG")
         
@@ -709,9 +745,9 @@ def enviar_formulario(
         log(f"    ✅ Opção '{rota}' selecionada", "DEBUG")
         
         log("  Clicando botão Avançar (página 2)...", "DEBUG")
-        btn2 = wait.until(EC.element_to_be_clickable(
-            (By.XPATH, "//span[normalize-space(text())='Avançar' or normalize-space(text())='Próxima' or normalize-space(text())='Next']")
-        ))
+        btn2 = _encontrar_botao_avancar(driver, wait)
+        if not btn2:
+            raise Exception("Botão 'Avançar/Next' não encontrado na página 2")
         safe_click(driver, btn2)
         log("  ✅ Avançado para página 3", "DEBUG")
 
@@ -723,9 +759,9 @@ def enviar_formulario(
         log(f"    ✅ Telefone: {telefone}", "DEBUG")
         
         log("  Clicando botão Enviar...", "DEBUG")
-        btn_enviar = wait.until(EC.element_to_be_clickable(
-            (By.XPATH, "//span[normalize-space(text())='Enviar' or normalize-space(text())='Submit']")
-        ))
+        btn_enviar = _encontrar_botao_enviar(driver, wait)
+        if not btn_enviar:
+            raise Exception("Botão 'Enviar/Submit' não encontrado na página 3")
         safe_click(driver, btn_enviar)
         log("  ✅ Formulário enviado (clique realizado)", "DEBUG")
         
