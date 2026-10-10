@@ -323,7 +323,7 @@ def _encontrar_botao_enviar(driver, wait):
     return None
 
 
-def preencher_input_por_pergunta(driver, wait, pergunta: str, texto: str) -> None:
+def preencher_input_por_pergunta(driver, wait, pergunta: str, texto: str, log=None) -> None:
     """Localiza o input associado ao texto da pergunta e preenche o campo."""
     pergunta_normalizada = pergunta.lower().strip()
     palavras_chave = [p for p in pergunta_normalizada.split() if len(p) > 2]
@@ -359,14 +359,14 @@ def preencher_input_por_pergunta(driver, wait, pergunta: str, texto: str) -> Non
                 continue
 
     # DEBUG: Log all visible labels/spans to help diagnose
-    if container is None:
+    if container is None and log:
         try:
             all_labels = driver.find_elements(By.XPATH, "//span | //div | //label")
             for el in all_labels[:30]:
                 try:
                     txt = el.text.strip()
                     if txt and len(txt) > 2:
-                        print(f"DEBUG_LABEL: {txt[:80]}")
+                        log(f"DEBUG_LABEL: {txt[:80]}", "DEBUG")
                 except:
                     pass
         except:
@@ -613,14 +613,14 @@ def obter_rotas_disponiveis(
         log("Aguardando inputs de identificação...", "MAP")
         
         try:
-            preencher_input_por_pergunta(driver, wait, "Qual seu nome?", nome)
+            preencher_input_por_pergunta(driver, wait, "Qual seu nome?", nome, log)
             log(f"✅ Nome preenchido: {nome}", "MAP")
         except Exception as e:
             log(f"⚠️ Erro ao preencher nome: {str(e)[:80]}", "AVISO")
             raise
         
         try:
-            preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func)
+            preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func, log)
             log(f"✅ ID preenchido: {id_func}", "MAP")
         except Exception as e:
             log(f"⚠️ Erro ao preencher ID: {str(e)[:80]}", "AVISO")
@@ -726,10 +726,10 @@ def enviar_formulario(
 
         # Página 1: Identificação
         log("  Preenchendo página 1 (identificação)...", "DEBUG")
-        preencher_input_por_pergunta(driver, wait, "Qual seu nome?", nome)
+        preencher_input_por_pergunta(driver, wait, "Qual seu nome?", nome, log)
         log(f"    ✅ Nome: {nome}", "DEBUG")
         
-        preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func)
+        preencher_input_por_pergunta(driver, wait, "Qual seu ID?", id_func, log)
         log(f"    ✅ ID: {id_func}", "DEBUG")
         
         time.sleep(1)
