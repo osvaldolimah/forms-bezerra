@@ -29,7 +29,7 @@ st.set_page_config(
 # ==================== DATA DE VENCIMENTO ====================
 # Altere esta data para definir um novo vencimento.
 # Formato: date(Ano, Mês, Dia)
-DATA_VENCIMENTO = date(2027, 10, 8)
+DATA_VENCIMENTO = date(2026, 11, 9)
 
 def verificar_validade():
     """Verifica se a data de hoje ultrapassou a data de vencimento."""
