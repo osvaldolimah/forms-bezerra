@@ -321,6 +321,9 @@ def _encontrar_botao_enviar(driver, wait):
         except Exception:
             continue
     return None
+
+
+def preencher_input_por_pergunta(driver, wait, pergunta: str, texto: str) -> None:
     """Localiza o input associado ao texto da pergunta e preenche o campo."""
     pergunta_normalizada = pergunta.lower().strip()
     palavras_chave = [p for p in pergunta_normalizada.split() if len(p) > 2]
